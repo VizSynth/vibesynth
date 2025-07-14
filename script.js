@@ -1615,36 +1615,35 @@ function compileShaders() {
       vec4 base = texture2D(u_texture1, v_uv);
       vec4 blend = texture2D(u_texture2, v_uv);
       
+      // Debug output to verify both textures are being sampled
       vec3 result;
       float mode = u_blendMode;
       
-      // Debug: Add a small color tint based on blend mode to verify it's changing
-      vec3 debugTint = vec3(0.0);
+      // Add visible debug markers
+      float debugMarker = 0.0;
+      if (v_uv.x < 0.02) debugMarker = mode / 3.0; // Left edge shows blend mode
       
       if (mode < 0.5) {
-        // Normal: simple alpha blending
-        result = mix(base.rgb, blend.rgb, blend.a);
-        debugTint = vec3(0.1, 0.0, 0.0); // Slight red tint for Normal
+        // Normal: proper alpha blending
+        result = mix(base.rgb, blend.rgb, blend.a * u_opacity);
       } else if (mode < 1.5) {
-        // Multiply: should darken the image
-        result = blendMultiply(base.rgb, blend.rgb);
-        debugTint = vec3(0.0, 0.1, 0.0); // Slight green tint for Multiply
+        // Multiply: darkens
+        result = mix(base.rgb, base.rgb * blend.rgb, u_opacity);
       } else if (mode < 2.5) {
-        // Screen: should brighten the image
-        result = blendScreen(base.rgb, blend.rgb);
-        debugTint = vec3(0.0, 0.0, 0.1); // Slight blue tint for Screen
+        // Screen: brightens
+        result = mix(base.rgb, blendScreen(base.rgb, blend.rgb), u_opacity);
       } else if (mode < 3.5) {
-        // Overlay: complex contrast effect
-        result = blendOverlay(base.rgb, blend.rgb);
-        debugTint = vec3(0.1, 0.1, 0.0); // Slight yellow tint for Overlay
+        // Overlay: contrast
+        result = mix(base.rgb, blendOverlay(base.rgb, blend.rgb), u_opacity);
       } else {
-        // Fallback to normal
-        result = mix(base.rgb, blend.rgb, blend.a);
+        // Fallback
+        result = base.rgb;
       }
       
-      // Apply opacity and add debug tint
-      vec3 final = mix(base.rgb, result + debugTint, u_opacity);
-      gl_FragColor = vec4(final, max(base.a, blend.a));
+      // Add debug marker
+      result = mix(result, vec3(debugMarker, 1.0 - debugMarker, mode / 3.0), step(v_uv.x, 0.02));
+      
+      gl_FragColor = vec4(result, 1.0);
     }
   `;
   programs.layer = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragLayer));
@@ -4910,6 +4909,12 @@ function setNodeUniforms(node) {
     }
   }
 
+  // Debug Layer inputs before binding
+  if (node.type === 'Layer') {
+    console.log(`🎯 Layer ${node.name} has ${node.inputs.length} inputs:`, 
+      node.inputs.map((inp, i) => inp ? `${i}: ${inp.name}` : `${i}: empty`));
+  }
+
   // Set input textures
   node.inputs.forEach((inputNode, index) => {
     if (inputNode && inputNode.texture && !inputNode.deleted) {
@@ -4949,9 +4954,9 @@ function setNodeUniforms(node) {
       const uniformName = isMultiInputNode ? `u_texture${index + 1}` : (index === 0 ? "u_texture" : `u_texture${index + 1}`);
       const loc = gl.getUniformLocation(program, uniformName);
       if (loc) {
-        gl.uniform1i(loc, index);
         gl.activeTexture(gl.TEXTURE0 + index);
         gl.bindTexture(gl.TEXTURE_2D, inputNode.texture);
+        gl.uniform1i(loc, index);
         
         // Debug logging for Layer nodes
         if (node.type === 'Layer') {
