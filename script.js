@@ -4817,7 +4817,8 @@ function setNodeUniforms(node) {
   
   // Set parameters as uniforms
   Object.entries(node.params).forEach(([key, value]) => {
-    const uniformName = `u_${key.toLowerCase()}`;
+    // Special case for blendMode to maintain camelCase
+    const uniformName = key === 'blendMode' ? 'u_blendMode' : `u_${key.toLowerCase()}`;
     const loc = gl.getUniformLocation(program, uniformName);
     
     if (loc) {
@@ -4839,8 +4840,17 @@ function setNodeUniforms(node) {
       } else if (key === 'blendMode') {
         const modes = { 'Normal': 0, 'Multiply': 1, 'Screen': 2, 'Overlay': 3 };
         const modeValue = modes[value] || 0;
-        gl.uniform1f(loc, modeValue);
-        console.log(`🎨 Setting blend mode for ${node.name}: "${value}" -> ${modeValue}`);
+        console.log(`🎨 Setting blend mode for ${node.name}: "${value}" -> ${modeValue}, loc:`, loc);
+        if (loc !== null && loc !== -1) {
+          gl.uniform1f(loc, parseFloat(modeValue));
+          // Verify the uniform was set
+          const error = gl.getError();
+          if (error !== gl.NO_ERROR) {
+            console.error(`WebGL error setting blendMode uniform:`, error);
+          }
+        } else {
+          console.error(`❌ Could not find uniform location for u_blendMode in ${node.name}`);
+        }
       } else if (key === 'colorPalette' && node.type === 'Oscillator') {
         // Handle color palette for oscillator
         const palette = colorPalettes[value];
