@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Web Visual Synthesizer</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Material Design Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Main application container -->
+  <div id="app">
+    <!-- Top toolbar -->
+    <div id="toolbar">
+      <div class="toolbar-section">
+        <div class="logo">
+          <span class="material-icons">movie_filter</span>
+          <span>Untitled Synthesis</span>
+        </div>
+      </div>
+      
+      <div class="toolbar-section">
+        <button id="new-project-btn" class="toolbar-btn" title="New Synthesis">
+          <span class="material-icons">note_add</span>
+        </button>
+        <button id="save-project-btn" class="toolbar-btn" title="Save">
+          <span class="material-icons">save</span>
+        </button>
+        <button id="load-project-btn" class="toolbar-btn" title="Load">
+          <span class="material-icons">folder_open</span>
+        </button>
+        <button id="rename-project-btn" class="toolbar-btn" title="Rename">
+          <span class="material-icons">edit</span>
+        </button>
+        <button id="share-project-btn" class="toolbar-btn" title="Share via URL">
+          <span class="material-icons">share</span>
+        </button>
+      </div>
+      
+      <div class="toolbar-section">
+        <button id="undo-btn" class="toolbar-btn" title="Nothing to undo" disabled>
+          <span class="material-icons">undo</span>
+        </button>
+        <button id="redo-btn" class="toolbar-btn" title="Nothing to redo" disabled>
+          <span class="material-icons">redo</span>
+        </button>
+        <button id="copy-btn" class="toolbar-btn" title="Select a node to copy" disabled>
+          <span class="material-icons">content_copy</span>
+        </button>
+        <button id="paste-btn" class="toolbar-btn" title="Nothing to paste" disabled>
+          <span class="material-icons">content_paste</span>
+        </button>
+      </div>
+      
+      <div class="toolbar-section">
+        <div id="update-status" class="update-status" title="Auto-update active">
+          <span class="material-icons">update</span>
+        </div>
+        <button id="fullscreen-btn" class="toolbar-btn" title="Fullscreen">
+          <span class="material-icons">fullscreen</span>
+        </button>
+        <select id="resolution-select" class="toolbar-select" title="Rendering resolution">
+          <option value="Low">Low (640×360)</option>
+          <option value="Medium" selected>Medium (854×480)</option>
+          <option value="High">High (1280×720)</option>
+          <option value="Ultra">Ultra (1920×1080)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Main content area -->
+    <div id="main-content">
+      <!-- Left sidebar with node palette -->
+      <div id="left-sidebar">
+        <div class="sidebar-header">
+          <h3>Add Nodes</h3>
+        </div>
+        
+        <div class="node-category">
+          <h4>Sources</h4>
+          <div class="node-palette">
+            <div class="palette-node" data-type="Oscillator" title="Generate wave patterns">
+              <span class="material-icons">waves</span>
+              <span>Oscillator</span>
+            </div>
+            <div class="palette-node" data-type="Noise" title="Generate noise textures">
+              <span class="material-icons">grain</span>
+              <span>Noise</span>
+            </div>
+            <div class="palette-node" data-type="Shape" title="Draw geometric shapes">
+              <span class="material-icons">circle</span>
+              <span>Shape</span>
+            </div>
+            <div class="palette-node" data-type="Video" title="Webcam input">
+              <span class="material-icons">videocam</span>
+              <span>Video</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="node-category">
+          <h4>Effects</h4>
+          <div class="node-palette">
+            <div class="palette-node" data-type="Transform" title="Position, scale, rotate">
+              <span class="material-icons">transform</span>
+              <span>Transform</span>
+            </div>
+            <div class="palette-node" data-type="ColorAdjust" title="Adjust brightness, contrast, saturation">
+              <span class="material-icons">tune</span>
+              <span>Color Adjust</span>
+            </div>
+            <div class="palette-node" data-type="Kaleidoscope" title="Mirror symmetry effect">
+              <span class="material-icons">auto_fix_high</span>
+              <span>Kaleidoscope</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="node-category">
+          <h4>Compositing</h4>
+          <div class="node-palette">
+            <div class="palette-node" data-type="Mix" title="Blend two inputs">
+              <span class="material-icons">merge_type</span>
+              <span>Mix</span>
+            </div>
+            <div class="palette-node" data-type="Layer" title="Blend with modes (multiply, screen, etc)">
+              <span class="material-icons">layers</span>
+              <span>Layer</span>
+            </div>
+            <div class="palette-node" data-type="Composite" title="Layer up to 4 inputs">
+              <span class="material-icons">view_quilt</span>
+              <span>Composite</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="node-category control-inputs-category">
+          <h4>
+            <span class="material-icons category-icon">sensors</span>
+            Control Inputs
+          </h4>
+          <div class="category-description">Real-time input sources for parameter control</div>
+          <div class="node-palette control-inputs-palette">
+            <div class="palette-node control-input-node" data-type="MIDIInput" title="MIDI controller input">
+              <span class="material-icons">piano</span>
+              <span>MIDI</span>
+            </div>
+            <div class="palette-node control-input-node" data-type="AudioInput" title="Microphone audio analysis">
+              <span class="material-icons">graphic_eq</span>
+              <span>Audio</span>
+            </div>
+            <div class="palette-node control-input-node" data-type="CursorInput" title="Mouse position input">
+              <span class="material-icons">mouse</span>
+              <span>Cursor</span>
+            </div>
+            <div class="palette-node control-input-node" data-type="CameraInput" title="Camera motion detection">
+              <span class="material-icons">videocam</span>
+              <span>Camera</span>
+            </div>
+            <div class="palette-node control-input-node" data-type="RandomInput" title="Random number generator">
+              <span class="material-icons">casino</span>
+              <span>Random</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="node-category">
+          <h4>Groups</h4>
+          <button id="create-group-btn" class="create-btn" title="Create new group">
+            <span class="material-icons">create_new_folder</span>
+            Create Group
+          </button>
+          <div id="groups-list"></div>
+        </div>
+      </div>
+
+      <!-- Center area with canvas and node graph -->
+      <div id="center-area">
+        <!-- WebGL Canvas -->
+        <canvas id="glcanvas"></canvas>
+        
+        <!-- Node Graph Overlay -->
+        <div id="node-graph">
+          <svg id="connections-svg"></svg>
+          <div id="nodes-container"></div>
+        </div>
+
+        <!-- Graph controls -->
+        <div id="graph-controls">
+          <button id="toggle-graph-btn" class="graph-btn active" title="Toggle Node Graph">
+            <span class="material-icons">account_tree</span>
+          </button>
+          <button id="fit-graph-btn" class="graph-btn" title="Fit Graph to View">
+            <span class="material-icons">fit_screen</span>
+          </button>
+          <button id="reset-zoom-btn" class="graph-btn" title="Reset Zoom">
+            <span class="material-icons">zoom_out_map</span>
+          </button>
+          <button id="auto-layout-btn" class="graph-btn active" title="Auto Layout (On)">
+            <span class="material-icons">auto_awesome</span>
+          </button>
+          <button id="toggle-minimap-btn" class="graph-btn" title="Show Overview">
+            <span class="material-icons">map</span>
+          </button>
+        </div>
+        
+        <!-- Mini-map -->
+        <div id="mini-map" style="display: none;">
+          <div class="mini-map-header">Overview</div>
+          <div id="mini-map-content">
+            <div id="mini-map-viewport"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right sidebar with properties -->
+      <div id="right-sidebar">
+        <!-- Node Properties Section -->
+        <div class="sidebar-header node-section">
+          <span class="material-icons">settings</span>
+          <h3>Node Properties</h3>
+        </div>
+        <div id="properties-panel">
+          <div class="properties-empty">
+            Select a node to edit its properties
+          </div>
+        </div>
+
+        <!-- Global View Controls Section -->
+        <div class="sidebar-header view-section">
+          <span class="material-icons">visibility</span>
+          <h3>View Controls</h3>
+        </div>
+        
+        <div class="sidebar-section view-control">
+          <label class="view-label" for="main-output-select">
+            <span class="material-icons">tv</span>
+            Canvas
+          </label>
+          <select id="main-output-select" title="Choose which node to display on canvas">
+            <option value="">Final Output</option>
+          </select>
+        </div>
+
+        <!-- Debug Panel -->
+        <div class="sidebar-section view-control">
+          <div class="view-label">
+            <span class="material-icons">bug_report</span>
+            Debug Info
+          </div>
+          <div id="debug-info" style="background: #1a1a1a; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto;">
+            <div id="debug-content">Debug info will appear here...</div>
+          </div>
+        </div>
+
+        <div class="sidebar-section view-control">
+          <div class="view-label">
+            <span class="material-icons">sensors</span>
+            Control Inputs
+          </div>
+          <div class="control-input-manager">
+            <div class="control-input-section">
+              <label class="control-input-label" for="existing-control-inputs">Available in Graph:</label>
+              <select id="existing-control-inputs" class="property-input">
+                <option value="">No control inputs in graph</option>
+              </select>
+            </div>
+            <div class="control-input-section">
+              <label class="control-input-label" for="new-control-input-type">Add New:</label>
+              <select id="new-control-input-type" class="property-input">
+                <option value="">Choose type to create...</option>
+                <option value="MIDIInput">MIDI Controller</option>
+                <option value="AudioInput">Audio Analysis</option>
+                <option value="CursorInput">Mouse/Cursor</option>
+                <option value="CameraInput">Camera Motion</option>
+                <option value="RandomInput">Random Generator</option>
+              </select>
+            </div>
+            <div class="control-input-status">
+              <span id="control-input-status">Ready</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project Browser Modal -->
+  <div id="project-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Synthesis Projects</h3>
+        <div class="modal-controls">
+          <select id="sort-projects">
+            <option value="modified">Last Modified</option>
+            <option value="created">Created</option>
+            <option value="name">Name</option>
+          </select>
+          <button id="close-modal-btn" class="toolbar-btn" title="Close">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div id="projects-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename Project Modal -->
+  <div id="rename-modal" class="modal">
+    <div class="modal-content small">
+      <div class="modal-header">
+        <h3>Rename Synthesis</h3>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="project-name-input" class="property-input" placeholder="Enter synthesis name">
+        <div class="modal-buttons">
+          <button id="save-rename-btn" class="create-btn">Save</button>
+          <button id="cancel-rename-btn" class="toolbar-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Share URL Modal -->
+  <div id="share-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Share Project</h3>
+        <button id="close-share-modal-btn" class="toolbar-btn" title="Close">
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="property-field">
+          <label class="property-label" for="share-url">Shareable URL</label>
+          <textarea id="share-url" class="property-input" readonly rows="3" placeholder="Generating URL..."></textarea>
+          <button id="copy-url-btn" class="create-btn" style="margin-top: 8px;" title="Copy URL to clipboard">
+            <span class="material-icons">content_copy</span>
+            Copy URL
+          </button>
+        </div>
+        
+        <div class="property-field">
+          <label class="property-label" for="import-data">Import from URL or JSON</label>
+          <textarea id="import-data" class="property-input" rows="4" placeholder="Paste a shareable URL or JSON data here..."></textarea>
+          <button id="import-project-btn" class="create-btn" style="margin-top: 8px;" title="Import project from URL or JSON">
+            <span class="material-icons">file_download</span>
+            Import Project
+          </button>
+        </div>
+        
+        <div class="property-field">
+          <div class="property-label">Project Statistics</div>
+          <div id="project-stats" class="midi-info">
+            <div>Nodes: <span id="stats-nodes">0</span></div>
+            <div>Size: <span id="stats-size">0 bytes</span></div>
+            <div>Compressed: <span id="stats-compressed">0 bytes</span></div>
+            <div>URL Length: <span id="stats-url-length">0 chars</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main application script -->
+  <script src="script.js?v=2.8-update-ux"></script>
+  
+  <!-- Test suite (only in development) -->
+  <script src="test-suite.js"></script>
+</body>
+</html>
