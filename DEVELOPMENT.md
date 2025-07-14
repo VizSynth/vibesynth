@@ -11,8 +11,12 @@
 - Initialized Git repository with full project history
 - Created backup system (manual checkpoints + git)
 
-**Current Issue**: Layer blending still not working - shows only one input instead of blending
-**Debug Status**: Implemented extreme visual debug mode but blend modes still not switching
+**Session Summary**: 
+- Fixed critical uniform name bug (u_blendMode vs u_blendmode)
+- Blend mode value now reaches shader (debug bars change color)
+- Visual output changes between modes but doesn't produce correct effects
+- Added debug strips to verify texture differences
+- Updated KNOWN_ISSUES.md with current status
 
 ---
 

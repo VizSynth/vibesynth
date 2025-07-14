@@ -1618,22 +1618,28 @@ function compileShaders() {
       vec3 result;
       float mode = u_blendMode;
       
-      // SIMPLE TEST: Let's verify the blend modes with clear visual differences
-      if (mode < 0.5) {
-        // Normal: show 50/50 mix for testing
-        result = mix(base.rgb, blend.rgb, 0.5);
-      } else if (mode < 1.5) {
-        // Multiply: should be MUCH darker
-        result = base.rgb * blend.rgb;
-      } else if (mode < 2.5) {
-        // Screen: should be MUCH brighter
-        result = vec3(1.0) - (vec3(1.0) - base.rgb) * (vec3(1.0) - blend.rgb);
-      } else if (mode < 3.5) {
-        // Overlay: show only blend texture for clear difference
-        result = blend.rgb;
+      // DEBUG: Show both textures side by side to verify they're different
+      if (v_uv.y < 0.1) {
+        // Top strip: show texture difference
+        result = abs(base.rgb - blend.rgb) * 5.0; // Amplify differences
       } else {
-        // Fallback: show only base
-        result = base.rgb;
+        // SIMPLE TEST: Let's verify the blend modes with clear visual differences
+        if (mode < 0.5) {
+          // Normal: show 50/50 mix for testing
+          result = mix(base.rgb, blend.rgb, 0.5);
+        } else if (mode < 1.5) {
+          // Multiply: should be MUCH darker
+          result = base.rgb * blend.rgb;
+        } else if (mode < 2.5) {
+          // Screen: should be MUCH brighter
+          result = vec3(1.0) - (vec3(1.0) - base.rgb) * (vec3(1.0) - blend.rgb);
+        } else if (mode < 3.5) {
+          // Overlay: show only blend texture for clear difference
+          result = blend.rgb;
+        } else {
+          // Fallback: show only base
+          result = base.rgb;
+        }
       }
       
       // Apply opacity

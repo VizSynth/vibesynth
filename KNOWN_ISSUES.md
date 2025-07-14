@@ -1,4 +1,18 @@
-# Known Issues & Bug Tracker
+# Known Issues
+
+## 2025-07-14 - Layer Blend Modes
+
+**Issue**: Layer node blend modes change the output but don't produce correct Photoshop-style blending effects
+**Status**: Partially fixed - blend mode value reaches shader but visual results incorrect
+**Details**:
+- Debug color bars change correctly (red/green/blue/yellow)
+- Blend mode uniform is being set correctly
+- Output changes between modes but doesn't match expected behavior
+- Multiply should be darker, Screen should be brighter
+**Next Steps**: 
+- Verify both input textures are different
+- Check if textures are binding to correct units
+- Test with simplified shader to isolate issue & Bug Tracker
 
 This file tracks known bugs, errors, and issues that need to be addressed in the visual synthesizer application.
 
