@@ -1618,40 +1618,30 @@ function compileShaders() {
       vec3 result;
       float mode = u_blendMode;
       
-      // DEBUG: Show both textures side by side to verify they're different
-      if (v_uv.y < 0.1) {
-        // Top strip: show texture difference
-        result = abs(base.rgb - blend.rgb) * 5.0; // Amplify differences
+      // Photoshop-style blend modes
+      if (mode < 0.5) {
+        // Normal: standard alpha blending
+        result = blend.rgb;
+      } else if (mode < 1.5) {
+        // Multiply: darkens (base * blend)
+        result = base.rgb * blend.rgb;
+      } else if (mode < 2.5) {
+        // Screen: lightens (inverse multiply)
+        result = vec3(1.0) - (vec3(1.0) - base.rgb) * (vec3(1.0) - blend.rgb);
+      } else if (mode < 3.5) {
+        // Overlay: combines multiply and screen
+        vec3 overlayed;
+        overlayed.r = base.r < 0.5 ? (2.0 * base.r * blend.r) : (1.0 - 2.0 * (1.0 - base.r) * (1.0 - blend.r));
+        overlayed.g = base.g < 0.5 ? (2.0 * base.g * blend.g) : (1.0 - 2.0 * (1.0 - base.g) * (1.0 - blend.g));
+        overlayed.b = base.b < 0.5 ? (2.0 * base.b * blend.b) : (1.0 - 2.0 * (1.0 - base.b) * (1.0 - blend.b));
+        result = overlayed;
       } else {
-        // SIMPLE TEST: Let's verify the blend modes with clear visual differences
-        if (mode < 0.5) {
-          // Normal: show 50/50 mix for testing
-          result = mix(base.rgb, blend.rgb, 0.5);
-        } else if (mode < 1.5) {
-          // Multiply: should be MUCH darker
-          result = base.rgb * blend.rgb;
-        } else if (mode < 2.5) {
-          // Screen: should be MUCH brighter
-          result = vec3(1.0) - (vec3(1.0) - base.rgb) * (vec3(1.0) - blend.rgb);
-        } else if (mode < 3.5) {
-          // Overlay: show only blend texture for clear difference
-          result = blend.rgb;
-        } else {
-          // Fallback: show only base
-          result = base.rgb;
-        }
+        // Fallback to normal
+        result = blend.rgb;
       }
       
-      // Apply opacity
+      // Apply opacity blending with base
       result = mix(base.rgb, result, u_opacity);
-      
-      // Debug marker on left edge
-      if (v_uv.x < 0.02) {
-        if (mode < 0.5) result = vec3(1.0, 0.0, 0.0); // Red
-        else if (mode < 1.5) result = vec3(0.0, 1.0, 0.0); // Green
-        else if (mode < 2.5) result = vec3(0.0, 0.0, 1.0); // Blue
-        else result = vec3(1.0, 1.0, 0.0); // Yellow
-      }
       
       gl_FragColor = vec4(result, 1.0);
     }
