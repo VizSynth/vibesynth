@@ -1615,33 +1615,37 @@ function compileShaders() {
       vec4 base = texture2D(u_texture1, v_uv);
       vec4 blend = texture2D(u_texture2, v_uv);
       
-      // Debug output to verify both textures are being sampled
       vec3 result;
       float mode = u_blendMode;
       
-      // Add visible debug markers
-      float debugMarker = 0.0;
-      if (v_uv.x < 0.02) debugMarker = mode / 3.0; // Left edge shows blend mode
-      
+      // SIMPLE TEST: Let's verify the blend modes with clear visual differences
       if (mode < 0.5) {
-        // Normal: proper alpha blending
-        result = mix(base.rgb, blend.rgb, blend.a * u_opacity);
+        // Normal: show 50/50 mix for testing
+        result = mix(base.rgb, blend.rgb, 0.5);
       } else if (mode < 1.5) {
-        // Multiply: darkens
-        result = mix(base.rgb, base.rgb * blend.rgb, u_opacity);
+        // Multiply: should be MUCH darker
+        result = base.rgb * blend.rgb;
       } else if (mode < 2.5) {
-        // Screen: brightens
-        result = mix(base.rgb, blendScreen(base.rgb, blend.rgb), u_opacity);
+        // Screen: should be MUCH brighter
+        result = vec3(1.0) - (vec3(1.0) - base.rgb) * (vec3(1.0) - blend.rgb);
       } else if (mode < 3.5) {
-        // Overlay: contrast
-        result = mix(base.rgb, blendOverlay(base.rgb, blend.rgb), u_opacity);
+        // Overlay: show only blend texture for clear difference
+        result = blend.rgb;
       } else {
-        // Fallback
+        // Fallback: show only base
         result = base.rgb;
       }
       
-      // Add debug marker
-      result = mix(result, vec3(debugMarker, 1.0 - debugMarker, mode / 3.0), step(v_uv.x, 0.02));
+      // Apply opacity
+      result = mix(base.rgb, result, u_opacity);
+      
+      // Debug marker on left edge
+      if (v_uv.x < 0.02) {
+        if (mode < 0.5) result = vec3(1.0, 0.0, 0.0); // Red
+        else if (mode < 1.5) result = vec3(0.0, 1.0, 0.0); // Green
+        else if (mode < 2.5) result = vec3(0.0, 0.0, 1.0); // Blue
+        else result = vec3(1.0, 1.0, 0.0); // Yellow
+      }
       
       gl_FragColor = vec4(result, 1.0);
     }
