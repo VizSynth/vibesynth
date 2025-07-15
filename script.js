@@ -947,6 +947,7 @@ class SynthNode {
       },
       Layer: {
         inputs: [null, null],
+        controlInputs: [null, null], // opacity, blendMode
         params: { opacity: 1.0, blendMode: 'Normal' },
         icon: 'layers',
         category: 'compositing'
@@ -5260,6 +5261,12 @@ function renderNode(node, time) {
             // Map 0-1 value to color index range (usually 0-12)
             const maxIndex = 12;
             node.params[paramName] = value * maxIndex;
+          } else if (paramName === 'blendMode') {
+            // Map 0-1 value to blend modes
+            const blendModes = ['Normal', 'Multiply', 'Screen', 'Overlay'];
+            const modeIndex = Math.floor(value * blendModes.length);
+            const clampedIndex = Math.min(modeIndex, blendModes.length - 1);
+            node.params[paramName] = blendModes[clampedIndex];
           } else if (typeof node.params[paramName] === 'number') {
             // Handle numeric parameters
             let scaledValue = value;
