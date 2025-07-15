@@ -2203,11 +2203,14 @@ function performAutoLayout() {
   Logger.info('Performing auto-layout...');
   showAutoLayoutFeedback();
 
-  // Simple and effective layout approach
+  // Improved layout configuration
   const SPACING = {
-    x: 250,      // Horizontal spacing between columns
-    y: 150,      // Vertical spacing between nodes
-    groupGap: 400 // Extra gap for disconnected nodes
+    x: 300,      // Horizontal spacing between columns (increased)
+    y: 180,      // Vertical spacing between nodes (increased)
+    groupGap: 250, // Gap between disconnected groups
+    startX: 100,
+    startY: 100,
+    canvasOffset: { x: 250, y: 150 }
   };
 
   // Categorize nodes
@@ -2276,13 +2279,24 @@ function performAutoLayout() {
   // Sort groups by size (largest first)
   groups.sort((a, b) => b.length - a.length);
   
-  let currentY = 100; // Start position
+  let currentY = SPACING.startY; // Start position
   
   // Layout each group
   groups.forEach((group, groupIndex) => {
+    Logger.debug(`Laying out group ${groupIndex} with ${group.length} nodes`);
     // Calculate depth for each node in the group
     const depths = new Map();
-    const sources = group.filter(n => !reverseConnections.get(n.id).length);
+    const sources = group.filter(n => {
+      // Control input nodes are always sources
+      if (n.category === 'input') return true;
+      // Other nodes with no inputs are sources
+      return !reverseConnections.get(n.id) || reverseConnections.get(n.id).length === 0;
+    });
+    
+    // If no sources found, make the first node a source
+    if (sources.length === 0 && group.length > 0) {
+      sources.push(group[0]);
+    }
     
     // BFS to assign depths
     sources.forEach(source => depths.set(source.id, 0));
@@ -2335,39 +2349,68 @@ function performAutoLayout() {
     });
     
     // Position nodes in this group
-    const startX = 100;
     let maxY = currentY;
     
-    // Layout by depth
+    // Handle single unconnected nodes differently
+    if (group.length === 1 && sources.length === 1) {
+      // Simple placement for isolated nodes
+      const node = group[0];
+      const x = SPACING.startX + (groupIndex % 3) * SPACING.x;
+      const y = currentY;
+      animateNodeToPosition(node, x, y);
+      maxY = y;
+      currentY = y + SPACING.y;
+      return; // Skip the complex layout for single nodes
+    }
+    
+    // Layout by depth with proper spacing
     const sortedDepths = Array.from(layers.keys()).sort((a, b) => a - b);
+    let groupHeight = 0;
+    
     sortedDepths.forEach(depth => {
       const layerNodes = layers.get(depth);
-      const x = startX + (depth * SPACING.x);
+      const x = SPACING.startX + (depth * SPACING.x);
+      
+      // Calculate total height needed for this layer
+      const layerHeight = layerNodes.length * SPACING.y;
+      groupHeight = Math.max(groupHeight, layerHeight);
+      
+      // Center the layer vertically within the group
+      const layerStartY = currentY + (groupHeight - layerHeight) / 2;
       
       layerNodes.forEach((node, idx) => {
-        const y = currentY + (idx * SPACING.y);
+        const y = layerStartY + (idx * SPACING.y);
         animateNodeToPosition(node, x, y);
         maxY = Math.max(maxY, y);
       });
     });
     
     // Add gap before next group
-    currentY = maxY + SPACING.groupGap;
+    currentY = Math.max(currentY + groupHeight, maxY) + SPACING.groupGap;
   });
   
-  // Position Canvas node
+  // Position Canvas node with proper offset
   if (canvasNode) {
-    // Find rightmost and bottommost regular node
-    let maxX = 100;
-    let maxY = 100;
+    // Find rightmost and bottommost regular node positions
+    let maxX = SPACING.startX;
+    let maxY = SPACING.startY;
+    let rightmostNodeX = SPACING.startX;
     
     regularNodes.forEach(node => {
+      // Track actual rightmost position including node width
+      if (node.x > rightmostNodeX) {
+        rightmostNodeX = node.x;
+      }
       maxX = Math.max(maxX, node.x);
       maxY = Math.max(maxY, node.y);
     });
     
-    // Position Canvas to the right and below
-    animateNodeToPosition(canvasNode, maxX + SPACING.x, maxY + SPACING.y);
+    // Position Canvas to the right and slightly below
+    const canvasX = rightmostNodeX + SPACING.canvasOffset.x;
+    const canvasY = maxY + SPACING.canvasOffset.y;
+    
+    Logger.debug(`Positioning Canvas node at (${canvasX}, ${canvasY})`);
+    animateNodeToPosition(canvasNode, canvasX, canvasY);
   }
   
   // Update connections after animation
