@@ -2285,22 +2285,21 @@ function calculateOptimalLayout(graph) {
         
         // Calculate barycenter (average position) of connected nodes
         const getBarycenter = (nodeData) => {
-          if (nodeData.inputs.length === 0) return 0;
+          if (nodeData.inputs.length === 0) return Infinity; // Nodes with no inputs go to bottom
           
           let totalY = 0;
-          let totalWeight = 0;
+          let count = 0;
           
-          nodeData.inputs.forEach((input, idx) => {
+          // Simple average of input positions
+          nodeData.inputs.forEach(input => {
             const inputPos = positions.get(input.from);
             if (inputPos) {
-              // Weight connections by their port index to maintain order
-              const weight = 1.0 / (idx + 1);
-              totalY += inputPos.y * weight;
-              totalWeight += weight;
+              totalY += inputPos.y;
+              count++;
             }
           });
           
-          return totalWeight > 0 ? totalY / totalWeight : 0;
+          return count > 0 ? totalY / count : Infinity;
         };
         
         const aBarycenter = getBarycenter(aData);
@@ -2315,21 +2314,33 @@ function calculateOptimalLayout(graph) {
         return aBarycenter - bBarycenter;
       });
     } else {
-      // For the first layer, sort by number of outputs and type
+      // For the first layer, sort by output connections to minimize initial crossings
       layerNodes.sort((a, b) => {
         const aData = graph.nodes.get(a);
         const bData = graph.nodes.get(b);
-        const aNode = aData.node;
-        const bNode = bData.node;
         
-        // Group by category first
-        if (aNode.category !== bNode.category) {
-          const categoryOrder = ['input', 'source', 'effect', 'compositing', 'system'];
-          return categoryOrder.indexOf(aNode.category) - categoryOrder.indexOf(bNode.category);
-        }
+        // Calculate average Y position of nodes this connects to
+        const getAvgOutputY = (nodeData) => {
+          if (nodeData.outputs.length === 0) return Infinity;
+          
+          let totalY = 0;
+          let count = 0;
+          
+          // Look ahead to where this node connects
+          nodeData.outputs.forEach(output => {
+            const targetData = graph.nodes.get(output.to);
+            if (targetData && targetData.depth > nodeData.depth) {
+              // Estimate Y position based on node index
+              const targetIndex = nodes.findIndex(n => n.id === output.to);
+              totalY += targetIndex * 120; // Approximate Y spacing
+              count++;
+            }
+          });
+          
+          return count > 0 ? totalY / count : Infinity;
+        };
         
-        // Within category, sort by output count
-        return bData.outputs.length - aData.outputs.length;
+        return getAvgOutputY(aData) - getAvgOutputY(bData);
       });
     }
     
@@ -2413,49 +2424,70 @@ function optimizeLayoutCrossings(graph, positions) {
   const sortedLayers = Array.from(layers.keys()).sort((a, b) => a - b);
   
   // Perform multiple passes to minimize crossings
-  const maxPasses = 3;
+  const maxPasses = 5; // More passes for better optimization
   for (let pass = 0; pass < maxPasses; pass++) {
+    let totalCrossings = 0;
     let improved = false;
     
+    // Try both forward and backward passes
+    const layerOrder = pass % 2 === 0 ? sortedLayers : [...sortedLayers].reverse();
+    
     // For each adjacent pair of layers
-    for (let i = 0; i < sortedLayers.length - 1; i++) {
-      const leftLayerX = sortedLayers[i];
-      const rightLayerX = sortedLayers[i + 1];
+    for (let i = 0; i < layerOrder.length - 1; i++) {
+      const leftLayerX = layerOrder[i];
+      const rightLayerX = layerOrder[i + 1];
       const leftNodes = layers.get(leftLayerX);
       const rightNodes = layers.get(rightLayerX);
       
-      // Try swapping nodes in the right layer to reduce crossings
-      for (let j = 0; j < rightNodes.length - 1; j++) {
-        for (let k = j + 1; k < rightNodes.length; k++) {
-          const nodeJ = rightNodes[j];
-          const nodeK = rightNodes[k];
-          
-          // Count crossings before swap
-          const crossingsBefore = countCrossings(graph, positions, leftNodes, rightNodes);
-          
-          // Swap positions
-          const posJ = positions.get(nodeJ);
-          const posK = positions.get(nodeK);
-          positions.set(nodeJ, { x: posJ.x, y: posK.y });
-          positions.set(nodeK, { x: posK.x, y: posJ.y });
-          
-          // Count crossings after swap
-          const crossingsAfter = countCrossings(graph, positions, leftNodes, rightNodes);
-          
-          // Keep swap if it reduces crossings
-          if (crossingsAfter < crossingsBefore) {
-            improved = true;
-            // Update the nodes array order
-            rightNodes[j] = nodeK;
-            rightNodes[k] = nodeJ;
-          } else {
-            // Revert swap
-            positions.set(nodeJ, posJ);
-            positions.set(nodeK, posK);
+      if (!leftNodes || !rightNodes) continue;
+      
+      // Sort nodes in the right layer by barycenter method
+      const nodePositions = new Map();
+      rightNodes.forEach(nodeId => {
+        const nodeData = graph.nodes.get(nodeId);
+        let barycenter = 0;
+        let count = 0;
+        
+        // Calculate barycenter based on connected nodes in left layer
+        nodeData.inputs.forEach(input => {
+          if (leftNodes.includes(input.from)) {
+            const leftPos = positions.get(input.from);
+            if (leftPos) {
+              barycenter += leftPos.y;
+              count++;
+            }
           }
+        });
+        
+        nodePositions.set(nodeId, count > 0 ? barycenter / count : Infinity);
+      });
+      
+      // Sort right layer nodes by their barycenter
+      rightNodes.sort((a, b) => nodePositions.get(a) - nodePositions.get(b));
+      
+      // Update positions based on new order
+      const startY = 80;
+      const ySpacing = 120;
+      rightNodes.forEach((nodeId, index) => {
+        const pos = positions.get(nodeId);
+        const newY = startY + (index * ySpacing);
+        if (Math.abs(pos.y - newY) > 1) {
+          improved = true;
+          positions.set(nodeId, { x: pos.x, y: newY });
         }
+      });
+    }
+    
+    // Count total crossings after this pass
+    for (let i = 0; i < sortedLayers.length - 1; i++) {
+      const leftNodes = layers.get(sortedLayers[i]);
+      const rightNodes = layers.get(sortedLayers[i + 1]);
+      if (leftNodes && rightNodes) {
+        totalCrossings += countCrossings(graph, positions, leftNodes, rightNodes);
       }
     }
+    
+    Logger.debug(`Layout optimization pass ${pass + 1}: ${totalCrossings} crossings`);
     
     // Stop if no improvements were made
     if (!improved) break;
