@@ -2169,7 +2169,8 @@ function buildNodeGraph() {
       inputs: [],
       outputs: [],
       depth: -1,
-      position: null
+      position: null,
+      isCanvas: node.type === 'FinalOutput' || node.name === 'Canvas'
     });
   });
   
@@ -2214,10 +2215,10 @@ function buildNodeGraph() {
  * Calculate depth of each node in the graph
  */
 function calculateNodeDepths(graph) {
-  // Find source nodes (no inputs)
+  // Find source nodes (no inputs, excluding Canvas)
   const sources = [];
   graph.nodes.forEach((data, id) => {
-    if (data.inputs.length === 0) {
+    if (!data.isCanvas && data.inputs.length === 0) {
       data.depth = 0;
       sources.push(id);
     }
@@ -2252,13 +2253,15 @@ function calculateNodeDepths(graph) {
 function calculateOptimalLayout(graph) {
   const positions = new Map();
   
-  // Group nodes by depth
+  // Group nodes by depth (excluding Canvas)
   const layers = new Map();
   graph.nodes.forEach((data, id) => {
-    if (!layers.has(data.depth)) {
-      layers.set(data.depth, []);
+    if (!data.isCanvas) {
+      if (!layers.has(data.depth)) {
+        layers.set(data.depth, []);
+      }
+      layers.get(data.depth).push(id);
     }
-    layers.get(data.depth).push(id);
   });
   
   // Position nodes layer by layer
@@ -2348,16 +2351,18 @@ function calculateOptimalLayout(graph) {
     });
   });
   
-  // Special handling for Canvas node
-  const canvasNode = nodes.find(n => n.name === 'Canvas');
+  // Special handling for Canvas node (check both name and type)
+  const canvasNode = nodes.find(n => n.type === 'FinalOutput' || n.name === 'Canvas');
   if (canvasNode) {
     // Find the rightmost and bottommost positions of all other nodes
     let maxX = 0;
     let maxY = 0;
     let rightmostNodeY = 0;
+    let nodeCount = 0;
     
     positions.forEach((pos, id) => {
       if (id !== canvasNode.id) {
+        nodeCount++;
         if (pos.x >= maxX) {
           maxX = pos.x;
           rightmostNodeY = pos.y; // Y position of the rightmost node
@@ -2366,10 +2371,20 @@ function calculateOptimalLayout(graph) {
       }
     });
     
+    // If no other nodes positioned yet, use defaults
+    if (nodeCount === 0) {
+      maxX = 250;
+      maxY = 200;
+      rightmostNodeY = 200;
+    }
+    
     // Position Canvas to the right and below
     // Use the Y position of the rightmost node plus offset to avoid overlap
-    const canvasX = maxX + 200; // Further right to avoid overlap
-    const canvasY = Math.max(rightmostNodeY + 150, maxY + 100); // Below rightmost or bottommost
+    const canvasX = maxX + 250; // Further right to avoid overlap
+    const canvasY = Math.max(rightmostNodeY + 150, maxY + 150); // Below rightmost or bottommost
+    
+    Logger.debug(`Canvas positioning: rightmost=(${maxX}, ${rightmostNodeY}), bottommost=${maxY}, ` +
+                 `Canvas will be at (${canvasX}, ${canvasY})`);
     
     positions.set(canvasNode.id, {
       x: canvasX,
