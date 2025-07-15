@@ -2131,37 +2131,191 @@ function createFinalOutputNode() {
 }
 
 /**
- * Auto-layout system - organizes nodes in clean layers
+ * Auto-layout system - organizes nodes in clean layers with proper spacing
  */
 function performAutoLayout() {
   if (!autoLayoutEnabled) return;
 
-  Logger.debug('Performing auto-layout...');
-
-  // Show visual feedback that auto-layout is active
+  Logger.info('Performing auto-layout...');
   showAutoLayoutFeedback();
 
-  // Build a graph representation for smarter layout
-  const nodeGraph = buildNodeGraph();
+  // Simple and effective layout approach
+  const SPACING = {
+    x: 250,      // Horizontal spacing between columns
+    y: 150,      // Vertical spacing between nodes
+    groupGap: 400 // Extra gap for disconnected nodes
+  };
+
+  // Categorize nodes
+  const canvasNode = nodes.find(n => n.type === 'FinalOutput' || n.name === 'Canvas');
+  const regularNodes = nodes.filter(n => n !== canvasNode);
   
-  // Calculate optimal positions to minimize crossings
-  const positions = calculateOptimalLayout(nodeGraph);
+  // Build connection map
+  const connections = new Map();
+  const reverseConnections = new Map();
   
-  // Log initial layout info
-  Logger.debug('Initial layout calculated:', {
-    nodeCount: positions.size,
-    layers: Array.from(new Set(Array.from(positions.values()).map(p => p.x))).length
+  regularNodes.forEach(node => {
+    connections.set(node.id, []);
+    reverseConnections.set(node.id, []);
   });
   
-  // Further optimize to reduce crossings
-  optimizeLayoutCrossings(nodeGraph, positions);
+  // Map all connections
+  regularNodes.forEach(node => {
+    // Main inputs
+    node.inputs.forEach((input, idx) => {
+      if (input && input.id) {
+        connections.get(input.id).push({ node: node, port: idx });
+        reverseConnections.get(node.id).push({ node: input, port: idx });
+      }
+    });
+    
+    // Control inputs
+    if (node.controlInputs) {
+      node.controlInputs.forEach((input, idx) => {
+        if (input && input.id) {
+          connections.get(input.id).push({ node: node, port: node.inputs.length + idx, isControl: true });
+          reverseConnections.get(node.id).push({ node: input, port: node.inputs.length + idx, isControl: true });
+        }
+      });
+    }
+  });
   
-  // Apply the calculated positions
-  applyLayoutPositions(positions);
+  // Find connected components (groups of connected nodes)
+  const visited = new Set();
+  const groups = [];
+  
+  regularNodes.forEach(node => {
+    if (!visited.has(node.id)) {
+      const group = [];
+      const queue = [node];
+      
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (visited.has(current.id)) continue;
+        
+        visited.add(current.id);
+        group.push(current);
+        
+        // Add connected nodes to queue
+        connections.get(current.id).forEach(conn => {
+          if (!visited.has(conn.node.id)) queue.push(conn.node);
+        });
+        reverseConnections.get(current.id).forEach(conn => {
+          if (!visited.has(conn.node.id)) queue.push(conn.node);
+        });
+      }
+      
+      groups.push(group);
+    }
+  });
+  
+  // Sort groups by size (largest first)
+  groups.sort((a, b) => b.length - a.length);
+  
+  let currentY = 100; // Start position
+  
+  // Layout each group
+  groups.forEach((group, groupIndex) => {
+    // Calculate depth for each node in the group
+    const depths = new Map();
+    const sources = group.filter(n => !reverseConnections.get(n.id).length);
+    
+    // BFS to assign depths
+    sources.forEach(source => depths.set(source.id, 0));
+    const queue = [...sources];
+    
+    while (queue.length > 0) {
+      const current = queue.shift();
+      const currentDepth = depths.get(current.id) || 0;
+      
+      connections.get(current.id).forEach(conn => {
+        if (!depths.has(conn.node.id) || depths.get(conn.node.id) > currentDepth + 1) {
+          depths.set(conn.node.id, currentDepth + 1);
+          queue.push(conn.node);
+        }
+      });
+    }
+    
+    // Group nodes by depth
+    const layers = new Map();
+    group.forEach(node => {
+      const depth = depths.get(node.id) || 0;
+      if (!layers.has(depth)) layers.set(depth, []);
+      layers.get(depth).push(node);
+    });
+    
+    // Sort each layer to minimize crossings
+    layers.forEach((layerNodes, depth) => {
+      if (depth > 0) {
+        // Sort by connection to previous layer
+        layerNodes.sort((a, b) => {
+          // Find which port each connects to
+          let aMinPort = Infinity;
+          let bMinPort = Infinity;
+          
+          reverseConnections.get(a.id).forEach(conn => {
+            if (depths.get(conn.node.id) === depth - 1) {
+              aMinPort = Math.min(aMinPort, conn.port);
+            }
+          });
+          
+          reverseConnections.get(b.id).forEach(conn => {
+            if (depths.get(conn.node.id) === depth - 1) {
+              bMinPort = Math.min(bMinPort, conn.port);
+            }
+          });
+          
+          return aMinPort - bMinPort;
+        });
+      }
+    });
+    
+    // Position nodes in this group
+    const startX = 100;
+    let maxY = currentY;
+    
+    // Layout by depth
+    const sortedDepths = Array.from(layers.keys()).sort((a, b) => a - b);
+    sortedDepths.forEach(depth => {
+      const layerNodes = layers.get(depth);
+      const x = startX + (depth * SPACING.x);
+      
+      layerNodes.forEach((node, idx) => {
+        const y = currentY + (idx * SPACING.y);
+        animateNodeToPosition(node, x, y);
+        maxY = Math.max(maxY, y);
+      });
+    });
+    
+    // Add gap before next group
+    currentY = maxY + SPACING.groupGap;
+  });
+  
+  // Position Canvas node
+  if (canvasNode) {
+    // Find rightmost and bottommost regular node
+    let maxX = 100;
+    let maxY = 100;
+    
+    regularNodes.forEach(node => {
+      maxX = Math.max(maxX, node.x);
+      maxY = Math.max(maxY, node.y);
+    });
+    
+    // Position Canvas to the right and below
+    animateNodeToPosition(canvasNode, maxX + SPACING.x, maxY + SPACING.y);
+  }
+  
+  // Update connections after animation
+  setTimeout(() => {
+    updateConnections();
+    fitGraphToView();
+  }, 600);
 }
 
 /**
  * Build a graph representation of nodes and their connections
+ * [DEPRECATED - Kept for compatibility]
  */
 function buildNodeGraph() {
   const graph = {
