@@ -1806,29 +1806,61 @@ function compileShaders() {
     varying vec2 v_uv;
 
     void main() {
-      vec4 result = vec4(0.0, 0.0, 0.0, 1.0);
-
-      if (u_activeInputs >= 1) {
+      vec4 result = vec4(0.0, 0.0, 0.0, 0.0);
+      float totalOpacity = 0.0;
+      
+      // Use float comparison for WebGL ES compatibility
+      float activeCount = float(u_activeInputs);
+      
+      // Layer 1
+      if (activeCount >= 0.5) {
         vec4 layer1 = texture2D(u_texture1, v_uv);
-        result.rgb = mix(result.rgb, layer1.rgb, layer1.a * u_opacity1);
+        float opacity1 = u_opacity1;
+        result.rgb += layer1.rgb * opacity1;
+        totalOpacity += opacity1;
       }
-      if (u_activeInputs >= 2) {
+      
+      // Layer 2
+      if (activeCount >= 1.5) {
         vec4 layer2 = texture2D(u_texture2, v_uv);
-        result.rgb = mix(result.rgb, layer2.rgb, layer2.a * u_opacity2);
+        float opacity2 = u_opacity2;
+        result.rgb += layer2.rgb * opacity2;
+        totalOpacity += opacity2;
       }
-      if (u_activeInputs >= 3) {
+      
+      // Layer 3
+      if (activeCount >= 2.5) {
         vec4 layer3 = texture2D(u_texture3, v_uv);
-        result.rgb = mix(result.rgb, layer3.rgb, layer3.a * u_opacity3);
+        float opacity3 = u_opacity3;
+        result.rgb += layer3.rgb * opacity3;
+        totalOpacity += opacity3;
       }
-      if (u_activeInputs >= 4) {
+      
+      // Layer 4
+      if (activeCount >= 3.5) {
         vec4 layer4 = texture2D(u_texture4, v_uv);
-        result.rgb = mix(result.rgb, layer4.rgb, layer4.a * u_opacity4);
+        float opacity4 = u_opacity4;
+        result.rgb += layer4.rgb * opacity4;
+        totalOpacity += opacity4;
       }
-
+      
+      // Normalize the result by total opacity
+      if (totalOpacity > 0.0) {
+        result.rgb /= totalOpacity;
+        result.a = 1.0;
+      } else {
+        result = vec4(0.0, 0.0, 0.0, 1.0);
+      }
+      
       gl_FragColor = result;
     }
   `;
   programs.composite = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragComposite));
+  if (!programs.composite) {
+    Logger.error('Composite shader compilation failed!');
+  } else {
+    Logger.info('Composite shader compiled successfully');
+  }
 
   // Copy shader - simple texture passthrough
   const fragCopy = `
@@ -5540,10 +5572,11 @@ function renderNode(node, time) {
     return;
   }
 
-  // Debug log for Layer and Mix nodes
-  if (node.type === 'Layer' || node.type === 'Mix') {
+  // Debug log for Layer, Mix and Composite nodes
+  if (node.type === 'Layer' || node.type === 'Mix' || node.type === 'Composite') {
     const validInputs = node.inputs.filter(n => n && !n.deleted && n.texture);
-    Logger.debug(`Rendering ${node.type} node: ${node.name}, valid inputs: ${validInputs.length}/2 [${validInputs.map(n => n.name).join(', ')}]`);
+    const expectedInputs = node.type === 'Composite' ? 4 : 2;
+    Logger.debug(`Rendering ${node.type} node: ${node.name}, valid inputs: ${validInputs.length}/${expectedInputs} [${validInputs.map(n => n.name).join(', ')}]`);
 
     // Special debugging for Layer nodes
     if (node.type === 'Layer') {
@@ -5959,9 +5992,14 @@ function setNodeUniforms(node) {
   if (node.type === 'Composite') {
     // Count how many inputs are connected
     const activeInputs = node.inputs.filter(input => input !== null).length;
+    Logger.debug(`Composite node ${node.name}: ${activeInputs} active inputs`);
+    
     const activeInputsLoc = gl.getUniformLocation(program, 'u_activeInputs');
     if (activeInputsLoc) {
       gl.uniform1i(activeInputsLoc, activeInputs);
+      Logger.debug(`Set u_activeInputs to ${activeInputs}`);
+    } else {
+      Logger.warn(`Could not find u_activeInputs uniform for Composite node ${node.name}`);
     }
     
     // Set opacity uniforms
@@ -5970,6 +6008,7 @@ function setNodeUniforms(node) {
       if (opacityLoc) {
         const opacityValue = node.params[`opacity${i}`] || 1.0;
         gl.uniform1f(opacityLoc, opacityValue);
+        Logger.debug(`Set u_opacity${i} to ${opacityValue}`);
       }
     }
   }
@@ -6004,8 +6043,8 @@ function bindNodeInputTextures(node) {
   // CRITICAL FIX: For multi-texture nodes, bind ALL textures FIRST, then set uniforms
   // This ensures all texture units remain bound when the shader executes
 
-  if (node.type === 'Layer') {
-    Logger.info(`Binding textures for Layer ${node.name}:`);
+  if (node.type === 'Layer' || node.type === 'Composite') {
+    Logger.info(`Binding textures for ${node.type} ${node.name}:`);
   }
 
   // First pass: Bind all textures to their respective texture units
@@ -6039,7 +6078,7 @@ function bindNodeInputTextures(node) {
       gl.activeTexture(gl.TEXTURE0 + textureUnit);
       gl.bindTexture(gl.TEXTURE_2D, inputNode.texture);
 
-      if (node.type === 'Layer') {
+      if (node.type === 'Layer' || node.type === 'Composite') {
         Logger.info(`  Texture unit ${textureUnit}: ${inputNode.name}`);
       }
 
@@ -6061,7 +6100,7 @@ function bindNodeInputTextures(node) {
     if (loc !== null && loc !== -1) {
       gl.uniform1i(loc, binding.textureUnit);
 
-      if (node.type === 'Layer') {
+      if (node.type === 'Layer' || node.type === 'Composite') {
         // Verify the uniform was set correctly
         const uniformValue = gl.getUniform(node.program, loc);
         Logger.info(`  ${uniformName} uniform set to: ${uniformValue}`);
