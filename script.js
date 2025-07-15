@@ -17,34 +17,29 @@ const LogLevel = {
 
 const Logger = {
   level: LogLevel.INFO, // Default log level
-  
+
   setLevel(level) {
     this.level = level;
   },
-  
+
   error(...args) {
     if (this.level >= LogLevel.ERROR) console.error(...args);
   },
-  
+
   warn(...args) {
     if (this.level >= LogLevel.WARN) console.warn(...args);
   },
-  
+
   info(...args) {
     if (this.level >= LogLevel.INFO) console.log(...args);
   },
-  
+
   debug(...args) {
     if (this.level >= LogLevel.DEBUG) console.log('🔍', ...args);
   },
-  
+
   trace(...args) {
     if (this.level >= LogLevel.TRACE) console.log('🔬', ...args);
-  },
-  
-  // Convenience method for temporary debugging
-  temp(...args) {
-    console.log('🚧 TEMP:', ...args);
   }
 };
 
@@ -52,26 +47,6 @@ const Logger = {
 window.Logger = Logger;
 window.LogLevel = LogLevel;
 
-// Add console helper
-Logger.info('📋 Logger commands:');
-Logger.info('  - Set to debug: Logger.setLevel(LogLevel.DEBUG)');
-Logger.info('  - Set to info: Logger.setLevel(LogLevel.INFO)');
-Logger.info('  - Set to error only: Logger.setLevel(LogLevel.ERROR)');
-Logger.info('  - Set to trace: Logger.setLevel(LogLevel.TRACE)');
-
-// Add Layer debugging info
-Logger.info('🎨 Layer debugging:');
-Logger.info('  - debugLayer() - Check Layer node state');
-Logger.info('  - testLayerOpacity() - Test different opacity values');
-Logger.info('  - testLayerBlend() - Test different blend modes');
-Logger.info('  - testSimpleMix() - Set to 50% opacity Normal mode');
-Logger.info('  - swapLayerInputs() - Swap base and blend inputs');
-Logger.info('  - window.debugLayerSplit = true - Enable split view');
-Logger.info('  - Look for colored squares:');
-Logger.info('    Top-left: Red=Normal, Green=Multiply, Blue=Screen, Yellow=Overlay');
-Logger.info('    Bottom-left: Base texture sample');
-Logger.info('    Bottom-right: Blend texture sample');
-Logger.info('  - Use the ⇄ button in properties to swap inputs');
 
 /** Parameter Validation System */
 const PARAMETER_CONSTRAINTS = {
@@ -94,19 +69,27 @@ const PARAMETER_CONSTRAINTS = {
   scaleY: { type: 'number', min: 0, max: 3, step: 0.01, default: 1.0 },
   slices: { type: 'integer', min: 1, max: 12, step: 1, default: 6 },
   offset: { type: 'number', min: 0, max: 1, step: 0.01, default: 0.5 },
-  
+
   // Random node parameters
   interval: { type: 'number', min: 0.01, max: 10, step: 0.01, default: 0.1 },
   min: { type: 'number', min: -100, max: 100, step: 0.01, default: 0.0 },
   max: { type: 'number', min: -100, max: 100, step: 0.01, default: 1.0 },
-  
+
   // Input node parameters
   ccNumber: { type: 'integer', min: 1, max: 127, step: 1, default: 1 },
   band: { type: 'string', values: ['overall', 'bass', 'lowMids', 'mids', 'highMids', 'highs'], default: 'overall' },
-  component: { type: 'string', values: ['x', 'y', 'velocity', 'click', 'motionX', 'brightness', 'motion', 'contrast'], default: 'x' },
-  
+  component: {
+    type: 'string',
+    values: ['x', 'y', 'velocity', 'click', 'motionX', 'brightness', 'motion', 'contrast'],
+    default: 'x'
+  },
+
   // String parameters with allowed values
-  colorPalette: { type: 'string', values: ['rainbow', 'sunset', 'ocean', 'forest', 'fire', 'purple', 'monochrome'], default: 'rainbow' },
+  colorPalette: {
+    type: 'string',
+    values: ['rainbow', 'sunset', 'ocean', 'forest', 'fire', 'purple', 'monochrome'],
+    default: 'rainbow'
+  },
   blendMode: { type: 'string', values: ['Normal', 'Multiply', 'Screen', 'Overlay'], default: 'Normal' },
   color: { type: 'color', default: '#ff0000' }
 };
@@ -119,12 +102,12 @@ const PARAMETER_CONSTRAINTS = {
  */
 function validateParameter(paramName, value) {
   const constraint = PARAMETER_CONSTRAINTS[paramName];
-  
+
   if (!constraint) {
     // No constraints defined, allow any value
     return { isValid: true, value: value };
   }
-  
+
   try {
     switch (constraint.type) {
       case 'number':
@@ -133,12 +116,14 @@ function validateParameter(paramName, value) {
           return { isValid: false, value: constraint.default, error: `${paramName} must be a number` };
         }
         const clampedNum = Math.max(constraint.min, Math.min(constraint.max, num));
-        return { 
-          isValid: clampedNum === num, 
+        return {
+          isValid: clampedNum === num,
           value: clampedNum,
-          error: clampedNum !== num ? `${paramName} clamped to range [${constraint.min}, ${constraint.max}]` : undefined
+          error: clampedNum !== num
+            ? `${paramName} clamped to range [${constraint.min}, ${constraint.max}]`
+            : undefined
         };
-        
+
       case 'integer':
         const int = parseInt(value);
         if (isNaN(int)) {
@@ -148,38 +133,40 @@ function validateParameter(paramName, value) {
         return {
           isValid: clampedInt === int,
           value: clampedInt,
-          error: clampedInt !== int ? `${paramName} clamped to range [${constraint.min}, ${constraint.max}]` : undefined
+          error: clampedInt !== int
+            ? `${paramName} clamped to range [${constraint.min}, ${constraint.max}]`
+            : undefined
         };
-        
+
       case 'string':
         if (constraint.values && !constraint.values.includes(value)) {
-          return { 
-            isValid: false, 
-            value: constraint.default, 
-            error: `${paramName} must be one of: ${constraint.values.join(', ')}` 
+          return {
+            isValid: false,
+            value: constraint.default,
+            error: `${paramName} must be one of: ${constraint.values.join(', ')}`
           };
         }
         return { isValid: true, value: value };
-        
+
       case 'color':
         const colorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
         if (!colorRegex.test(value)) {
-          return { 
-            isValid: false, 
-            value: constraint.default, 
-            error: `${paramName} must be a valid hex color (e.g., #ff0000)` 
+          return {
+            isValid: false,
+            value: constraint.default,
+            error: `${paramName} must be a valid hex color (e.g., #ff0000)`
           };
         }
         return { isValid: true, value: value };
-        
+
       default:
         return { isValid: true, value: value };
     }
   } catch (error) {
-    return { 
-      isValid: false, 
-      value: constraint.default, 
-      error: `Validation error for ${paramName}: ${error.message}` 
+    return {
+      isValid: false,
+      value: constraint.default,
+      error: `Validation error for ${paramName}: ${error.message}`
     };
   }
 }
@@ -202,7 +189,7 @@ function validateNodeParameters(node) {
   const errors = [];
   const correctedParams = { ...node.params };
   let hasChanges = false;
-  
+
   for (const [paramName, value] of Object.entries(node.params)) {
     const result = validateParameter(paramName, value);
     if (!result.isValid) {
@@ -218,7 +205,7 @@ function validateNodeParameters(node) {
       }
     }
   }
-  
+
   return {
     isValid: errors.length === 0,
     errors: errors,
@@ -245,23 +232,23 @@ const webglErrorCallbacks = new Set();
  */
 function checkWebGLError(operation = 'WebGL operation') {
   if (!gl || webglContextLost) return false;
-  
+
   const error = gl.getError();
   if (error !== gl.NO_ERROR) {
     const errorName = getWebGLErrorName(error);
     const errorMessage = `WebGL Error in ${operation}: ${errorName} (${error})`;
-    console.error(errorMessage);
+    Logger.error(errorMessage);
     lastWebGLError = { operation, error, errorName, timestamp: Date.now() };
-    
+
     // Notify error callbacks
     webglErrorCallbacks.forEach(callback => {
       try {
         callback(lastWebGLError);
       } catch (e) {
-        console.error('Error in WebGL error callback:', e);
+        Logger.error('Error in WebGL error callback:', e);
       }
     });
-    
+
     return false;
   }
   return true;
@@ -272,17 +259,17 @@ function checkWebGLError(operation = 'WebGL operation') {
  */
 function getWebGLErrorName(error) {
   if (!gl) return 'Unknown';
-  
+
   const errorNames = {
     [gl.NO_ERROR]: 'NO_ERROR',
     [gl.INVALID_ENUM]: 'INVALID_ENUM',
-    [gl.INVALID_VALUE]: 'INVALID_VALUE', 
+    [gl.INVALID_VALUE]: 'INVALID_VALUE',
     [gl.INVALID_OPERATION]: 'INVALID_OPERATION',
     [gl.INVALID_FRAMEBUFFER_OPERATION]: 'INVALID_FRAMEBUFFER_OPERATION',
     [gl.OUT_OF_MEMORY]: 'OUT_OF_MEMORY',
     [gl.CONTEXT_LOST_WEBGL]: 'CONTEXT_LOST_WEBGL'
   };
-  
+
   return errorNames[error] || `Unknown Error (${error})`;
 }
 
@@ -295,10 +282,10 @@ function getWebGLErrorName(error) {
  */
 function safeWebGLOperation(operation, description, fallbackValue = null) {
   if (!gl || webglContextLost) {
-    console.warn(`Skipping ${description} - WebGL not available`);
+    Logger.warn(`Skipping ${description} - WebGL not available`);
     return fallbackValue;
   }
-  
+
   try {
     const result = operation();
     if (!checkWebGLError(description)) {
@@ -306,7 +293,7 @@ function safeWebGLOperation(operation, description, fallbackValue = null) {
     }
     return result;
   } catch (error) {
-    console.error(`Exception in ${description}:`, error);
+    Logger.error(`Exception in ${description}:`, error);
     return fallbackValue;
   }
 }
@@ -345,42 +332,42 @@ const featureSupport = {
  * Detect WebGL and extension support
  */
 function detectWebGLFeatures() {
-  console.log('🔍 Detecting WebGL features...');
-  
+  Logger.debug('Detecting WebGL features...');
+
   // Test basic WebGL support
   const testCanvas = document.createElement('canvas');
   const testGL = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
-  
+
   if (testGL) {
     featureSupport.webgl = true;
-    
+
     // Test WebGL 2.0
     const testGL2 = testCanvas.getContext('webgl2');
     featureSupport.webgl2 = !!testGL2;
-    
+
     // Test extensions
     featureSupport.oes_texture_float = !!testGL.getExtension('OES_texture_float');
     featureSupport.oes_texture_half_float = !!testGL.getExtension('OES_texture_half_float');
     featureSupport.webgl_depth_texture = !!testGL.getExtension('WEBGL_depth_texture');
     featureSupport.ext_frag_depth = !!testGL.getExtension('EXT_frag_depth');
     featureSupport.webgl_draw_buffers = !!testGL.getExtension('WEBGL_draw_buffers');
-    
-    console.log('✅ WebGL supported');
+
+    Logger.info('WebGL supported');
   } else {
-    console.warn('❌ WebGL not supported');
+    Logger.error('WebGL not supported');
     featureSupport.fallbackMode = true;
   }
-  
+
   // Test getUserMedia support
   featureSupport.getUserMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-  
+
   // Test Web Audio API support
   featureSupport.audioContext = !!(window.AudioContext || window.webkitAudioContext);
-  
+
   // Test MIDI support
   featureSupport.midi = !!navigator.requestMIDIAccess;
-  
-  console.log('📊 Feature Support:', featureSupport);
+
+  Logger.info('Feature Support:', featureSupport);
   return featureSupport;
 }
 
@@ -388,28 +375,28 @@ function detectWebGLFeatures() {
  * Get fallback shader for unsupported features
  */
 function getFallbackShader(nodeType, reason = 'feature unsupported') {
-  console.log(`⚠️ Using fallback shader for ${nodeType}: ${reason}`);
-  
+  Logger.warn(`Using fallback shader for ${nodeType}: ${reason}`);
+
   // Simple fallback fragment shader that just shows a solid color or pattern
   return `
     precision mediump float;
     uniform float u_time;
     uniform vec2 u_resolution;
     varying vec2 v_uv;
-    
+
     void main() {
       // Simple animated gradient fallback
       float t = u_time * 0.5;
       vec3 color1 = vec3(0.5 + 0.5 * sin(t), 0.5 + 0.5 * cos(t), 0.7);
       vec3 color2 = vec3(0.8, 0.4 + 0.4 * sin(t * 1.3), 0.6);
-      
+
       float gradient = smoothstep(0.0, 1.0, v_uv.y);
       vec3 color = mix(color1, color2, gradient);
-      
+
       // Add some pattern to indicate this is a fallback
       float pattern = sin(v_uv.x * 20.0) * sin(v_uv.y * 20.0) * 0.1;
       color += pattern;
-      
+
       gl_FragColor = vec4(color, 1.0);
     }
   `;
@@ -419,8 +406,8 @@ function getFallbackShader(nodeType, reason = 'feature unsupported') {
  * Create fallback program for nodes that can't compile their shaders
  */
 function createFallbackProgram(nodeType, originalError) {
-  console.log(`🔧 Creating fallback program for ${nodeType} due to: ${originalError}`);
-  
+  Logger.debug(`Creating fallback program for ${nodeType} due to: ${originalError}`);
+
   const vertShader = compileShader(gl.VERTEX_SHADER, `
     attribute vec2 a_position;
     varying vec2 v_uv;
@@ -429,20 +416,20 @@ function createFallbackProgram(nodeType, originalError) {
       gl_Position = vec4(a_position, 0.0, 1.0);
     }
   `);
-  
+
   if (!vertShader) {
-    console.error('Even fallback vertex shader failed!');
+    Logger.error('Even fallback vertex shader failed!');
     return null;
   }
-  
+
   const fallbackFragSource = getFallbackShader(nodeType, originalError);
   const fragShader = compileShader(gl.FRAGMENT_SHADER, fallbackFragSource);
-  
+
   if (!fragShader) {
-    console.error('Fallback fragment shader failed!');
+    Logger.error('Fallback fragment shader failed!');
     return null;
   }
-  
+
   const program = createProgram(vertShader, fragShader);
   if (program) {
     program.isFallback = true;
@@ -455,8 +442,8 @@ function createFallbackProgram(nodeType, originalError) {
  * Handle unsupported node creation gracefully
  */
 function createFallbackNode(nodeType, x, y, reason) {
-  console.log(`🎭 Creating fallback node for ${nodeType}: ${reason}`);
-  
+  Logger.debug(`Creating fallback node for ${nodeType}: ${reason}`);
+
   // Create a basic node with fallback behavior
   const node = {
     id: generateNodeId(),
@@ -476,7 +463,7 @@ function createFallbackNode(nodeType, x, y, reason) {
     fallbackReason: reason,
     isFallback: true
   };
-  
+
   return node;
 }
 
@@ -498,17 +485,17 @@ function showFallbackNotification(feature, reason, impact) {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     animation: slideIn 0.3s ease-out;
   `;
-  
+
   notification.innerHTML = `
     <div style="font-weight: bold; margin-bottom: 4px;">⚠️ Feature Limitation</div>
     <div style="font-size: 14px; margin-bottom: 8px;">${feature}: ${reason}</div>
     <div style="font-size: 12px; opacity: 0.9;">${impact}</div>
-    <button onclick="this.parentElement.remove()" 
+    <button onclick="this.parentElement.remove()"
             style="position: absolute; top: 4px; right: 8px; background: none; border: none; color: white; cursor: pointer; font-size: 18px;">×</button>
   `;
-  
+
   document.body.appendChild(notification);
-  
+
   // Auto-remove after 10 seconds
   setTimeout(() => {
     if (notification.parentElement) {
@@ -522,18 +509,18 @@ function showFallbackNotification(feature, reason, impact) {
  */
 function initializeGracefulDegradation() {
   detectWebGLFeatures();
-  
+
   // Set up fallback behaviors
   if (!featureSupport.webgl) {
     showFallbackNotification(
-      'WebGL', 
+      'WebGL',
       'Not supported in this browser',
       'Visual synthesis disabled. Please use a modern browser with WebGL support.'
     );
     featureSupport.fallbackMode = true;
     return false;
   }
-  
+
   if (!featureSupport.oes_texture_float) {
     showFallbackNotification(
       'Floating Point Textures',
@@ -541,7 +528,7 @@ function initializeGracefulDegradation() {
       'Some advanced effects may appear simplified.'
     );
   }
-  
+
   if (!featureSupport.getUserMedia) {
     showFallbackNotification(
       'Camera Access',
@@ -549,7 +536,7 @@ function initializeGracefulDegradation() {
       'Video input nodes will not function.'
     );
   }
-  
+
   if (!featureSupport.audioContext) {
     showFallbackNotification(
       'Web Audio API',
@@ -557,7 +544,7 @@ function initializeGracefulDegradation() {
       'Audio analysis features disabled.'
     );
   }
-  
+
   if (!featureSupport.midi) {
     showFallbackNotification(
       'MIDI Support',
@@ -565,7 +552,7 @@ function initializeGracefulDegradation() {
       'MIDI input nodes will not function.'
     );
   }
-  
+
   return true;
 }
 
@@ -640,31 +627,31 @@ function getMemoryStats() {
  * Force cleanup of orphaned resources
  */
 function forceCleanupOrphanedResources() {
-  console.log('🧹 Force cleaning orphaned resources...');
-  
+  Logger.debug('Force cleaning orphaned resources...');
+
   const nodeIds = new Set(nodes.map(n => n.id));
-  
+
   // Clean up resources for nodes that no longer exist
   ['textures', 'framebuffers', 'buffers', 'videoStreams'].forEach(type => {
     const tracker = resourceTracker[type];
     for (const tracked of tracker) {
       if (tracked.nodeId && !nodeIds.has(tracked.nodeId)) {
-        console.log(`🗑️ Cleaning orphaned ${type.slice(0, -1)} from deleted node ${tracked.nodeId}`);
+        Logger.debug(`Cleaning orphaned ${type.slice(0, -1)} from deleted node ${tracked.nodeId}`);
         const resourceType = type.slice(0, -1); // Remove 's'
         cleanupResource(resourceType, tracked.resource);
       }
     }
   });
-  
+
   // Clean up event listeners for deleted nodes
   for (const [nodeId, listeners] of resourceTracker.eventListeners) {
     if (!nodeIds.has(nodeId)) {
-      console.log(`🗑️ Cleaning orphaned event listeners from deleted node ${nodeId}`);
+      Logger.debug(`Cleaning orphaned event listeners from deleted node ${nodeId}`);
       listeners.forEach(({ element, event, handler }) => {
         try {
           element.removeEventListener(event, handler);
         } catch (error) {
-          console.warn('Error removing orphaned event listener:', error);
+          Logger.warn('Error removing orphaned event listener:', error);
         }
       });
       resourceTracker.eventListeners.delete(nodeId);
@@ -682,124 +669,6 @@ let nodeCount = 0;
 let selectedNode = null;
 let mainOutputNode = null;
 
-// Debug mode for Layer nodes - set to true to see split view
-window.debugLayerSplit = false;
-
-// Test function for Layer blending
-window.testLayerBlend = function() {
-  const layerNode = nodes.find(n => n.type === 'Layer');
-  if (!layerNode) {
-    console.log('❌ No Layer node found');
-    return;
-  }
-  
-  Logger.info('Testing Layer blend modes...');
-  const modes = ['Normal', 'Multiply', 'Screen', 'Overlay'];
-  let currentIndex = 0;
-  
-  const testInterval = setInterval(() => {
-    if (currentIndex >= modes.length) {
-      clearInterval(testInterval);
-      Logger.info('Test complete. Check visual output.');
-      return;
-    }
-    
-    const mode = modes[currentIndex];
-    layerNode.params.blendMode = mode;
-    Logger.info(`Testing ${mode} mode...`);
-    currentIndex++;
-  }, 2000);
-  
-  Logger.info('Running blend mode test - watch the output change every 2 seconds');
-};
-
-// Debug function to check Layer node state
-window.debugLayer = function() {
-  const layerNode = nodes.find(n => n.type === 'Layer');
-  if (!layerNode) {
-    console.log('❌ No Layer node found');
-    return;
-  }
-  
-  console.log('Layer node state:', {
-    name: layerNode.name,
-    blendMode: layerNode.params.blendMode,
-    opacity: layerNode.params.opacity,
-    input1: layerNode.inputs[0]?.name || 'none',
-    input2: layerNode.inputs[1]?.name || 'none',
-    hasProgram: !!layerNode.program
-  });
-  
-  // Check uniforms
-  if (layerNode.program && gl) {
-    gl.useProgram(layerNode.program);
-    const blendLoc = gl.getUniformLocation(layerNode.program, 'u_blendMode');
-    const opacityLoc = gl.getUniformLocation(layerNode.program, 'u_opacity');
-    
-    if (blendLoc !== null) {
-      const blendValue = gl.getUniform(layerNode.program, blendLoc);
-      console.log('u_blendMode uniform value:', blendValue);
-    }
-    
-    if (opacityLoc !== null) {
-      const opacityValue = gl.getUniform(layerNode.program, opacityLoc);
-      console.log('u_opacity uniform value:', opacityValue);
-    }
-  }
-};
-
-// Quick test to see if blending works with different opacity
-window.testLayerOpacity = function() {
-  const layerNode = nodes.find(n => n.type === 'Layer');
-  if (!layerNode) {
-    console.log('❌ No Layer node found');
-    return;
-  }
-  
-  console.log('Testing Layer opacity...');
-  const opacities = [0, 0.25, 0.5, 0.75, 1.0];
-  let index = 0;
-  
-  const interval = setInterval(() => {
-    if (index >= opacities.length) {
-      clearInterval(interval);
-      console.log('Test complete');
-      return;
-    }
-    
-    layerNode.params.opacity = opacities[index];
-    console.log(`Opacity: ${opacities[index]}`);
-    index++;
-  }, 1500);
-};
-
-// Force simple 50/50 mix to test
-window.testSimpleMix = function() {
-  const layerNode = nodes.find(n => n.type === 'Layer');
-  if (!layerNode) {
-    console.log('❌ No Layer node found');
-    return;
-  }
-  
-  // Set to normal mode with 50% opacity - should show 50% of each input
-  layerNode.params.blendMode = 'Normal';
-  layerNode.params.opacity = 0.5;
-  console.log('Set Layer to Normal mode at 50% opacity - you should see both inputs mixed');
-};
-
-// Swap Layer inputs to test if they're reversed
-window.swapLayerInputs = function() {
-  const layerNode = nodes.find(n => n.type === 'Layer');
-  if (!layerNode) {
-    console.log('❌ No Layer node found');
-    return;
-  }
-  
-  const temp = layerNode.inputs[0];
-  layerNode.inputs[0] = layerNode.inputs[1];
-  layerNode.inputs[1] = temp;
-  console.log('Swapped Layer inputs - Base and Blend are now reversed');
-};
 
 // Node type definitions for UI
 const nodeDefinitions = {
@@ -808,24 +677,24 @@ const nodeDefinitions = {
   Noise: { inputs: [] },
   Shape: { inputs: [] },
   Video: { inputs: [] },
-  
+
   // Effects
   Transform: { inputs: [{ name: 'Input' }] },
   ColorAdjust: { inputs: [{ name: 'Input' }] },
   Kaleidoscope: { inputs: [{ name: 'Input' }] },
-  
+
   // Compositing
   Mix: { inputs: [{ name: 'Input 1' }, { name: 'Input 2' }] },
   Layer: { inputs: [{ name: 'Base (Bottom)' }, { name: 'Blend (Top)' }] },
   Composite: { inputs: [{ name: 'Input 1' }, { name: 'Input 2' }, { name: 'Input 3' }, { name: 'Input 4' }] },
-  
+
   // Control Inputs
   MIDIInput: { inputs: [] },
   AudioInput: { inputs: [] },
   CursorInput: { inputs: [] },
   CameraInput: { inputs: [] },
   RandomInput: { inputs: [] },
-  
+
   // System
   Canvas: { inputs: [{ name: 'Input' }] }
 };
@@ -864,7 +733,7 @@ const LAYOUT_CONFIG = {
   // Layer positions from left to right
   layers: {
     input: { x: 50, label: 'Inputs' },
-    source: { x: 250, label: 'Sources' }, 
+    source: { x: 250, label: 'Sources' },
     effect: { x: 450, label: 'Effects' },
     compositing: { x: 650, label: 'Compositing' },
     system: { x: 850, label: 'Output' }
@@ -895,7 +764,7 @@ let audioEnabled = false;
 // Audio analysis bands with enhanced metrics
 const audioBands = {
   bass: { min: 0, max: 120, value: 0, rms: 0, peak: 0 },      // 0-120Hz bass
-  lowMids: { min: 120, max: 500, value: 0, rms: 0, peak: 0 }, // 120-500Hz low mids  
+  lowMids: { min: 120, max: 500, value: 0, rms: 0, peak: 0 }, // 120-500Hz low mids
   mids: { min: 500, max: 2000, value: 0, rms: 0, peak: 0 },   // 500-2000Hz mids
   highMids: { min: 2000, max: 8000, value: 0, rms: 0, peak: 0 }, // 2-8kHz high mids
   highs: { min: 8000, max: 20000, value: 0, rms: 0, peak: 0 }, // 8-20kHz highs
@@ -952,7 +821,11 @@ const cameraComponents = {
 };
 
 const colorPalettes = {
-  'rainbow': ['#ff0000', '#ff8000', '#ffff00', '#80ff00', '#00ff00', '#00ff80', '#00ffff', '#0080ff', '#0000ff', '#8000ff', '#ff00ff', '#ff0080'],
+  'rainbow': [
+    '#ff0000', '#ff8000', '#ffff00', '#80ff00',
+    '#00ff00', '#00ff80', '#00ffff', '#0080ff',
+    '#0000ff', '#8000ff', '#ff00ff', '#ff0080'
+  ],
   'sunset': ['#ff6b35', '#f7931e', '#ffd700', '#ff8c42', '#ff5722', '#e91e63', '#9c27b0', '#673ab7'],
   'ocean': ['#006994', '#0085b8', '#00a1c9', '#2eb8d4', '#5ccfe0', '#89e5eb', '#b6fcf7'],
   'forest': ['#2d5016', '#3e6b1f', '#4f8328', '#60a032', '#71bd3b', '#8dd85e', '#aae382'],
@@ -1011,10 +884,11 @@ class SynthNode {
     const configs = {
       Oscillator: {
         inputs: [],
-        controlInputs: [null, null, null, null, null, null], // frequency, sync, offset, colorPalette, colorIndex, colorSpeed
-        params: { 
-          frequency: 10.0, 
-          sync: 0.1, 
+        // frequency, sync, offset, colorPalette, colorIndex, colorSpeed
+        controlInputs: [null, null, null, null, null, null],
+        params: {
+          frequency: 10.0,
+          sync: 0.1,
           offset: 0.5,
           colorPalette: 'rainbow',
           colorIndex: 0.0,
@@ -1131,7 +1005,7 @@ class SynthNode {
       this.icon = config.icon;
       this.category = config.category;
       this.program = programs[this.type.toLowerCase()];
-      
+
       // Initialize Random nodes with a random value
       if (this.type === 'RandomInput') {
         this.randomValue = Math.random();
@@ -1148,11 +1022,11 @@ class SynthNode {
       if (portElement) {
         const rect = portElement.getBoundingClientRect();
         const svgRect = document.getElementById('connections-svg').getBoundingClientRect();
-        
+
         // Use absolute screen coordinates relative to the SVG
         const x = rect.left + rect.width / 2 - svgRect.left;
         const y = rect.top + rect.height / 2 - svgRect.top;
-        
+
         return {
           index,
           x,
@@ -1178,23 +1052,23 @@ class SynthNode {
     if (portElement) {
       const rect = portElement.getBoundingClientRect();
       const svgRect = document.getElementById('connections-svg').getBoundingClientRect();
-      
+
       // Use absolute screen coordinates relative to the SVG
       const x = rect.left + rect.width / 2 - svgRect.left;
       const y = rect.top + rect.height / 2 - svgRect.top;
-      
+
       return {
         x,
         y,
         connected: this.hasConnections()
       };
     }
-    
+
     // Fallback to estimated position
     const nodeRect = this.element.getBoundingClientRect();
     const svgRect = document.getElementById('connections-svg').getBoundingClientRect();
     return {
-      x: nodeRect.right - 5 - svgRect.left, 
+      x: nodeRect.right - 5 - svgRect.left,
       y: nodeRect.top + 48 + this.inputs.length * 24 - svgRect.top,
       connected: this.hasConnections()
     };
@@ -1225,16 +1099,16 @@ function init() {
   initCursor();
   initCamera();
   handleResolutionChange('Medium');
-  
+
   // Create the permanent Final Output node
   createFinalOutputNode();
-  
+
   // Initialize update and project system (may restore saved project)
   const projectWasRestored = initUpdateSystem();
-  
+
   // Only create initial node if no project was restored
   if (!projectWasRestored) {
-    console.log('📄 No saved project found, creating default oscillator');
+    Logger.info('No saved project found, creating default oscillator');
     const initialOsc = createNode('Oscillator', 300, 200);
     const finalOutputNode = nodes.find(n => n.type === 'FinalOutput');
     if (finalOutputNode) {
@@ -1242,24 +1116,24 @@ function init() {
       updateConnections();
     }
   } else {
-    console.log('📄 Project restored from saved state, skipping default node creation');
+    Logger.info('Project restored from saved state, skipping default node creation');
   }
-  
+
   // Initialize graceful degradation system
   if (!initializeGracefulDegradation()) {
-    console.error('Critical features unavailable - app may not function properly');
+    Logger.error('Critical features unavailable - app may not function properly');
     return;
   }
-  
+
   // Validate data model consistency
   validateDataModelConsistency();
-  
+
   startRenderLoop();
   startColorAnalysis();
   startCursorTracking();
   startCameraAnalysis();
   startMemoryMonitoring();
-  
+
   // Perform initial auto-layout after everything is initialized
   setTimeout(() => {
     if (autoLayoutEnabled) {
@@ -1275,43 +1149,43 @@ function startMemoryMonitoring() {
   // Memory monitoring every 30 seconds
   const memoryMonitorInterval = setInterval(() => {
     const stats = getMemoryStats();
-    console.log('📊 Memory Stats:', stats);
-    
+    Logger.debug('Memory Stats:', stats);
+
     // DISABLED: Aggressive orphaned resource cleanup was causing crashes
     // The original code worked fine without this aggressive cleanup
     // if (now - lastCleanup > 300000) { // Every 5 minutes
     //   window.lastOrphanCleanup = now;
     //   forceCleanupOrphanedResources();
     // }
-    
+
     // Warn if resource count is getting high
     const totalResources = stats.textures + stats.framebuffers + stats.buffers;
     if (totalResources > 100) {
-      console.warn(`⚠️ High resource count detected: ${totalResources} WebGL resources`);
+      Logger.warn(`High resource count detected: ${totalResources} WebGL resources`);
     }
-    
+
     // Check for potential memory leaks
     if (stats.eventListeners > nodes.length * 2) {
-      console.warn(`⚠️ Potential event listener leak: ${stats.eventListeners} listeners for ${nodes.length} nodes`);
+      Logger.warn(`Potential event listener leak: ${stats.eventListeners} listeners for ${nodes.length} nodes`);
     }
   }, 30000);
-  
+
   // Simple interval tracking
   window.memoryMonitorInterval = memoryMonitorInterval;
-  
+
   // Removed aggressive cleanup - was causing crashes
-  
+
   // Memory stats command for development
   window.getMemoryStats = getMemoryStats;
-  
-  console.log('🔍 Memory monitoring started - use forceMemoryCleanup() or getMemoryStats() in console');
-  
+
+  Logger.debug('Memory monitoring started - use forceMemoryCleanup() or getMemoryStats() in console');
+
   // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
-    console.log('🧹 Page unloading - cleaning up all resources');
+    Logger.info('Page unloading - cleaning up all resources');
     cleanupAllResources();
   });
-  
+
   // Cleanup on visibility change (tab hidden for extended period)
   let hiddenTime = 0;
   document.addEventListener('visibilitychange', () => {
@@ -1333,14 +1207,14 @@ function cleanupAllResources() {
     clearInterval(window.memoryMonitorInterval);
     window.memoryMonitorInterval = null;
   }
-  
+
   // Stop video streams on all nodes directly
   nodes.forEach(node => {
     if (node.video && node.video.srcObject) {
       try {
         node.video.srcObject.getTracks().forEach(track => track.stop());
       } catch (error) {
-        console.warn('Error stopping video stream during cleanup:', error);
+        Logger.warn('Error stopping video stream during cleanup:', error);
       }
     }
     if (node.intervalId) {
@@ -1348,9 +1222,9 @@ function cleanupAllResources() {
       node.intervalId = null;
     }
   });
-  
+
   // Simple cleanup without aggressive tracking
-  
+
   // Clean up WebGL resources on all nodes directly
   if (gl && !webglContextLost) {
     nodes.forEach(node => {
@@ -1362,17 +1236,17 @@ function cleanupAllResources() {
           gl.deleteFramebuffer(node.fbo);
         }
       } catch (error) {
-        console.warn('Error deleting WebGL resources during cleanup:', error);
+        Logger.warn('Error deleting WebGL resources during cleanup:', error);
       }
     });
-    
+
     // Clean up quad buffer
     if (quadBuffer.buf && gl.isBuffer(quadBuffer.buf)) {
       gl.deleteBuffer(quadBuffer.buf);
     }
   }
-  
-  console.log('✅ All resources cleaned up');
+
+  Logger.info('All resources cleaned up');
 }
 
 // Fallback texture for failed nodes
@@ -1380,24 +1254,24 @@ let fallbackTexture = null;
 
 function createFallbackTexture() {
   if (fallbackTexture) return fallbackTexture;
-  
+
   fallbackTexture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, fallbackTexture);
-  
+
   // Create a simple 2x2 red texture as fallback
   const fallbackData = new Uint8Array([
     255, 0, 0, 255,   // Red
     255, 100, 100, 255,  // Light red
-    255, 100, 100, 255,  // Light red  
+    255, 100, 100, 255,  // Light red
     255, 0, 0, 255    // Red
   ]);
-  
+
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, fallbackData);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  
+
   Logger.debug('Created fallback texture for failed nodes');
   return fallbackTexture;
 }
@@ -1407,53 +1281,53 @@ function createFallbackTexture() {
  */
 function initWebGL() {
   canvas = document.getElementById("glcanvas");
-  
+
   try {
     gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-    
+
     if (!gl) {
       webglSupported = false;
       showWebGLError("WebGL not supported in this browser. Please try a different browser or enable WebGL.");
       return false;
     }
-    
+
     // Set up context loss recovery
     setupWebGLContextRecovery();
-    
+
     // Configure WebGL with error checking
     const success = safeWebGLOperation(() => {
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       return true;
     }, 'WebGL blend setup', false);
-    
+
     if (!success) {
       showWebGLError("Failed to configure WebGL blending.");
       return false;
     }
-    
+
     // Compile shaders and create buffers
     if (!compileShaders()) {
       showWebGLError("Failed to compile shaders.");
       return false;
     }
-    
+
     if (!initFullscreenQuad()) {
       showWebGLError("Failed to create rendering buffers.");
       return false;
     }
-    
+
     webglSupported = true;
     webglContextLost = false;
-    
+
     // Create fallback texture for failed nodes
     createFallbackTexture();
-    
+
     Logger.info('WebGL initialized successfully');
     return true;
-    
+
   } catch (error) {
-    console.error('WebGL initialization failed:', error);
+    Logger.error('WebGL initialization failed:', error);
     webglSupported = false;
     showWebGLError(`WebGL initialization failed: ${error.message}`);
     return false;
@@ -1465,23 +1339,23 @@ function initWebGL() {
  */
 function setupWebGLContextRecovery() {
   canvas.addEventListener('webglcontextlost', (event) => {
-    console.warn('🔴 WebGL context lost');
+    Logger.warn('WebGL context lost');
     event.preventDefault();
     webglContextLost = true;
-    
+
     // Stop rendering
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId);
       animationFrameId = null;
     }
-    
+
     showWebGLError("WebGL context lost. Attempting to recover...");
   });
-  
+
   canvas.addEventListener('webglcontextrestored', (event) => {
-    console.log('🟢 WebGL context restored, reinitializing...');
+    Logger.info('WebGL context restored, reinitializing...');
     webglContextLost = false;
-    
+
     // Reinitialize WebGL
     setTimeout(() => {
       if (initWebGL()) {
@@ -1489,7 +1363,7 @@ function setupWebGLContextRecovery() {
         restoreWebGLResources();
         // Restart rendering
         startRenderLoop();
-        console.log('✅ WebGL recovery complete');
+        Logger.info('WebGL recovery complete');
         hideWebGLError();
       } else {
         showWebGLError("Failed to recover WebGL context.");
@@ -1508,8 +1382,8 @@ function restoreWebGLResources() {
       createNodeTexture(node);
     }
   });
-  
-  console.log('🔄 WebGL resources restored');
+
+  Logger.info('WebGL resources restored');
 }
 
 /**
@@ -1537,11 +1411,11 @@ function showWebGLError(message) {
     `;
     document.body.appendChild(errorOverlay);
   }
-  
+
   errorOverlay.innerHTML = `
     <h3>WebGL Error</h3>
     <p>${message}</p>
-    <button onclick="this.parentElement.style.display='none'" 
+    <button onclick="this.parentElement.style.display='none'"
             style="margin-top: 10px; padding: 8px 16px; background: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer;">
       Close
     </button>
@@ -1572,9 +1446,9 @@ function compileShaders() {
     }
   `;
   const vertShader = compileShader(gl.VERTEX_SHADER, vertSrc);
-  
+
   if (!vertShader) {
-    console.error('Failed to compile vertex shader');
+    Logger.error('Failed to compile vertex shader');
     return false;
   }
 
@@ -1598,15 +1472,15 @@ function compileShaders() {
     uniform vec3 u_color7;
     uniform float u_palettesize;
     varying vec2 v_uv;
-    
+
     vec3 getPaletteColor(float t) {
       t = clamp(t, 0.0, 1.0);
       float scaledT = t * (u_palettesize - 1.0);
       float index = floor(scaledT);
       float frac = scaledT - index;
-      
+
       vec3 color1, color2;
-      
+
       // Use if-else chain instead of array indexing
       if (index < 0.5) {
         color1 = u_color0;
@@ -1633,32 +1507,32 @@ function compileShaders() {
         color1 = u_color7;
         color2 = u_color0; // Wrap around
       }
-      
+
       return mix(color1, color2, frac);
     }
-    
+
     void main() {
       float x = v_uv.x;
-      
+
       // Create oscillation pattern
       float wave = sin((x - u_offset/u_frequency + u_time * u_sync) * u_frequency * 6.2831);
       wave = wave * 0.5 + 0.5;
-      
+
       // Calculate color index based on position and time
       float colorT = fract(u_colorindex / u_palettesize + x * 0.5 + u_time * u_colorspeed * 0.1);
-      
+
       // Get base color from palette
       vec3 baseColor = getPaletteColor(colorT);
-      
+
       // Modulate with wave pattern
       vec3 finalColor = baseColor * (0.3 + 0.7 * wave);
-      
+
       gl_FragColor = vec4(finalColor, 1.0);
     }
   `;
   programs.oscillator = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragOsc));
   if (!programs.oscillator) {
-    console.warn('⚠️ Oscillator shader compilation failed, using fallback');
+    Logger.warn('Oscillator shader compilation failed, using fallback');
     programs.oscillator = createFallbackProgram('Oscillator', 'shader compilation failed');
   }
 
@@ -1693,7 +1567,7 @@ function compileShaders() {
   `;
   programs.noise = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragNoise));
   if (!programs.noise) {
-    console.warn('⚠️ Noise shader compilation failed, using fallback');
+    Logger.warn('Noise shader compilation failed, using fallback');
     programs.noise = createFallbackProgram('Noise', 'shader compilation failed');
   }
 
@@ -1819,16 +1693,16 @@ function compileShaders() {
     uniform float u_opacity;
     uniform float u_blendMode;
     varying vec2 v_uv;
-    
+
     void main() {
       // Sample both textures
       vec4 baseColor = texture2D(u_texture1, v_uv);
       vec4 blendColor = texture2D(u_texture2, v_uv);
-      
+
       // Extract RGB values
       vec3 base = baseColor.rgb;
       vec3 blend = blendColor.rgb;
-      
+
       // Debug mode: show split view when blendMode is negative
       if (u_blendMode < -0.5) {
         if (v_uv.x < 0.5) {
@@ -1838,55 +1712,24 @@ function compileShaders() {
         }
         return;
       }
-      
-      // Show blend mode indicator in corner (can be disabled)
-      bool showDebugIndicators = false; // Set to true to see debug indicators
-      
-      if (showDebugIndicators) {
-        if (v_uv.x < 0.1 && v_uv.y < 0.1) {
-          float mode = u_blendMode;
-          if (mode < 0.5) {
-            gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0); // Red = Normal
-          } else if (mode < 1.5) {
-            gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0); // Green = Multiply
-          } else if (mode < 2.5) {
-            gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0); // Blue = Screen
-          } else {
-            gl_FragColor = vec4(1.0, 1.0, 0.0, 1.0); // Yellow = Overlay
-          }
-          return;
-        }
-        
-        // Show texture samples in bottom corners
-        if (v_uv.y > 0.9) {
-          if (v_uv.x < 0.1) {
-            // Bottom left: show base texture sample
-            gl_FragColor = vec4(base, 1.0);
-            return;
-          } else if (v_uv.x > 0.9) {
-            // Bottom right: show blend texture sample
-            gl_FragColor = vec4(blend, 1.0);
-            return;
-          }
-        }
-      }
-      
+
+
       // Calculate blended result based on mode
       vec3 result;
       float mode = u_blendMode;
-      
+
       if (mode < 0.5) {
         // Normal mode - just the blend layer
         result = blend;
-      } 
+      }
       else if (mode < 1.5) {
         // Multiply mode - darkens
         result = base * blend;
-      } 
+      }
       else if (mode < 2.5) {
         // Screen mode - lightens
         result = vec3(1.0) - (vec3(1.0) - base) * (vec3(1.0) - blend);
-      } 
+      }
       else if (mode < 3.5) {
         // Overlay mode - combination of multiply and screen
         result = vec3(
@@ -1894,25 +1737,25 @@ function compileShaders() {
           base.g < 0.5 ? (2.0 * base.g * blend.g) : (1.0 - 2.0 * (1.0 - base.g) * (1.0 - blend.g)),
           base.b < 0.5 ? (2.0 * base.b * blend.b) : (1.0 - 2.0 * (1.0 - base.b) * (1.0 - blend.b))
         );
-      } 
+      }
       else {
         // Fallback to normal
         result = blend;
       }
-      
+
       // Apply opacity
       vec3 finalColor = mix(base, result, u_opacity);
-      
+
       // Output with full alpha
       gl_FragColor = vec4(finalColor, 1.0);
     }
   `;
   programs.layer = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragLayer));
   if (!programs.layer) {
-    console.error('❌ Layer shader compilation failed!');
+    Logger.error('Layer shader compilation failed!');
     programs.layer = createFallbackProgram('Layer', 'Layer shader compilation failed');
   } else {
-    console.log('✅ Layer shader compiled successfully');
+    Logger.info('Layer shader compiled successfully');
   }
 
   // Composite shader
@@ -1928,10 +1771,10 @@ function compileShaders() {
     uniform float u_opacity4;
     uniform int u_activeInputs;
     varying vec2 v_uv;
-    
+
     void main() {
       vec4 result = vec4(0.0, 0.0, 0.0, 1.0);
-      
+
       if (u_activeInputs >= 1) {
         vec4 layer1 = texture2D(u_texture1, v_uv);
         result.rgb = mix(result.rgb, layer1.rgb, layer1.a * u_opacity1);
@@ -1948,7 +1791,7 @@ function compileShaders() {
         vec4 layer4 = texture2D(u_texture4, v_uv);
         result.rgb = mix(result.rgb, layer4.rgb, layer4.a * u_opacity4);
       }
-      
+
       gl_FragColor = result;
     }
   `;
@@ -1959,14 +1802,14 @@ function compileShaders() {
     precision mediump float;
     uniform sampler2D u_texture;
     varying vec2 v_uv;
-    
+
     void main() {
       gl_FragColor = texture2D(u_texture, v_uv);
     }
   `;
   programs.copy = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragCopy));
   if (!programs.copy) {
-    console.error('❌ Copy shader compilation failed - this is critical!');
+    Logger.error('Copy shader compilation failed - this is critical!');
     programs.copy = createFallbackProgram('Copy', 'critical shader compilation failed');
   }
 
@@ -1985,26 +1828,26 @@ function compileShaders() {
   programs.audioinput = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragInput));
   programs.cursorinput = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragInput));
   programs.camerainput = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragInput));
-  
+
   // Final Output shader - uses copy shader for passthrough
   programs.finaloutput = programs.copy;
-  
+
   // Check if all essential programs compiled successfully (including fallbacks)
   const requiredPrograms = ['oscillator', 'noise', 'shape', 'copy'];
   const missingPrograms = requiredPrograms.filter(name => !programs[name]);
-  
+
   if (missingPrograms.length > 0) {
-    console.error('❌ Critical shader programs missing even after fallback attempts:', missingPrograms);
+    Logger.error('Critical shader programs missing even after fallback attempts:', missingPrograms);
     return false;
   }
-  
+
   // Count fallback programs
   const fallbackCount = Object.values(programs).filter(program => program && program.isFallback).length;
   if (fallbackCount > 0) {
-    console.warn(`⚠️ ${fallbackCount} shader programs using fallbacks - some features may be simplified`);
+    Logger.warn(`${fallbackCount} shader programs using fallbacks - some features may be simplified`);
   }
-  
-  console.log('✅ All essential shader programs available (including any fallbacks)');
+
+  Logger.info('All essential shader programs available (including any fallbacks)');
   return true;
 }
 
@@ -2012,13 +1855,13 @@ function compileShader(type, source) {
   return safeWebGLOperation(() => {
     const shader = gl.createShader(type);
     if (!shader) return null;
-    
+
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
-    
+
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
       const error = gl.getShaderInfoLog(shader);
-      console.error("Shader compile error:", error);
+      Logger.error("Shader compile error:", error);
       gl.deleteShader(shader);
       return null;
     }
@@ -2028,21 +1871,21 @@ function compileShader(type, source) {
 
 function createProgram(vs, fs) {
   if (!vs || !fs) {
-    console.error("Cannot create program: missing shaders");
+    Logger.error("Cannot create program: missing shaders");
     return null;
   }
-  
+
   return safeWebGLOperation(() => {
     const prog = gl.createProgram();
     if (!prog) return null;
-    
+
     gl.attachShader(prog, vs);
     gl.attachShader(prog, fs);
     gl.linkProgram(prog);
-    
+
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
       const error = gl.getProgramInfoLog(prog);
-      console.error("Shader program link error:", error);
+      Logger.error("Shader program link error:", error);
       gl.deleteProgram(prog);
       return null;
     }
@@ -2055,9 +1898,9 @@ function initFullscreenQuad() {
     const quadVerts = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
     quadBuffer.buf = gl.createBuffer();
     if (!quadBuffer.buf) return false;
-    
+
     // Quad buffer for rendering (simple, no tracking)
-    
+
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer.buf);
     gl.bufferData(gl.ARRAY_BUFFER, quadVerts, gl.STATIC_DRAW);
     quadBuffer.itemSize = 2;
@@ -2073,7 +1916,7 @@ function initUI() {
   // Initialize graph visibility
   const nodeGraph = document.getElementById('node-graph');
   const toggleBtn = document.getElementById('toggle-graph-btn');
-  
+
   if (graphVisible) {
     nodeGraph.classList.add('visible');
   }
@@ -2095,21 +1938,21 @@ function initUI() {
   document.getElementById('load-project-btn').addEventListener('click', showProjectBrowser);
   document.getElementById('rename-project-btn').addEventListener('click', showRenameModal);
   document.getElementById('share-project-btn').addEventListener('click', showShareModal);
-  
+
   // Undo/Redo event listeners
   document.getElementById('undo-btn').addEventListener('click', undo);
   document.getElementById('redo-btn').addEventListener('click', redo);
-  
+
   // Copy/Paste event listeners
   document.getElementById('copy-btn').addEventListener('click', copySelectedNodes);
   document.getElementById('paste-btn').addEventListener('click', pasteNodes);
-  
+
   // Modal event listeners
   document.getElementById('close-modal-btn').addEventListener('click', hideProjectBrowser);
   document.getElementById('sort-projects').addEventListener('change', refreshProjectsList);
   document.getElementById('save-rename-btn').addEventListener('click', saveRename);
   document.getElementById('cancel-rename-btn').addEventListener('click', hideRenameModal);
-  
+
   // Share modal event listeners
   document.getElementById('close-share-modal-btn').addEventListener('click', hideShareModal);
   document.getElementById('copy-url-btn').addEventListener('click', copyShareURL);
@@ -2119,7 +1962,7 @@ function initUI() {
       hideShareModal();
     }
   });
-  
+
   // Close modals on backdrop click
   document.getElementById('project-modal').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) hideProjectBrowser();
@@ -2130,7 +1973,7 @@ function initUI() {
   document.getElementById('share-modal').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) hideShareModal();
   });
-  
+
   // Enter key handling for rename input
   document.getElementById('project-name-input').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') saveRename();
@@ -2171,14 +2014,14 @@ function initUI() {
 
   // Graph interaction
   setupGraphInteraction();
-  
+
   // Mini-map interaction
   setupMiniMapInteraction();
-  
+
   // Graph controls
   document.getElementById('fit-graph-btn').addEventListener('click', fitGraphToView);
   document.getElementById('reset-zoom-btn').addEventListener('click', resetGraphZoom);
-  
+
   // Auto-layout toggle
   document.getElementById('auto-layout-btn').addEventListener('click', () => {
     autoLayoutEnabled = !autoLayoutEnabled;
@@ -2188,11 +2031,11 @@ function initUI() {
       btn.title = 'Auto Layout (On)';
       performAutoLayout(); // Apply layout immediately when enabled
     } else {
-      btn.classList.remove('active'); 
+      btn.classList.remove('active');
       btn.title = 'Auto Layout (Off)';
     }
   });
-  
+
   // Minimap toggle
   document.getElementById('toggle-minimap-btn').addEventListener('click', () => {
     const minimap = document.getElementById('mini-map');
@@ -2208,10 +2051,10 @@ function initUI() {
       btn.title = 'Show Overview';
     }
   });
-  
+
   // Control Input Manager
   initControlInputManager();
-  
+
   // Track mouse position for cursor input nodes
   document.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -2222,8 +2065,10 @@ function initUI() {
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     // Check if user is typing in an input field
-    const isTyping = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.contentEditable === 'true';
-    
+    const isTyping = e.target.tagName === 'INPUT' ||
+                     e.target.tagName === 'TEXTAREA' ||
+                     e.target.contentEditable === 'true';
+
     // Copy/Paste shortcuts (work even when typing)
     if ((e.ctrlKey || e.metaKey) && e.key === 'c' && !e.shiftKey && !isTyping) {
       e.preventDefault();
@@ -2257,30 +2102,30 @@ function createFinalOutputNode() {
   // Position Canvas in bottom right area
   const x = 1000; // Far right position
   const y = 400;  // Bottom area position
-  
+
   const finalOutputNode = new SynthNode('FinalOutput', x, y);
   finalOutputNode.name = 'Canvas';
-  
+
   // Ensure inputs array is properly initialized
   if (!finalOutputNode.inputs) {
     finalOutputNode.inputs = [null];
   }
-  
+
   nodes.push(finalOutputNode);
-  
+
   // Setup WebGL resources (it needs a framebuffer like other nodes)
   allocateNodeFBO(finalOutputNode);
-  
+
   // Create visual representation
   createNodeElement(finalOutputNode);
   updateConnections();
   updateMainOutputDropdown();
-  
+
   // Set as main output initially
   setMainOutput(finalOutputNode);
-  
-  console.log('🖥️ Created permanent Canvas node');
-  
+
+  Logger.info('Created permanent Canvas node');
+
   return finalOutputNode;
 }
 
@@ -2289,145 +2134,146 @@ function createFinalOutputNode() {
  */
 function performAutoLayout() {
   if (!autoLayoutEnabled) return;
-  
-  console.log('🎨 Performing auto-layout...');
-  
+
+  Logger.debug('Performing auto-layout...');
+
   // Show visual feedback that auto-layout is active
   showAutoLayoutFeedback();
-  
+
   // Group nodes by category, with special handling for Canvas
   const nodesByCategory = {
     input: nodes.filter(n => n.category === 'input' && n.name !== 'Canvas'),
-    source: nodes.filter(n => n.category === 'source' && n.name !== 'Canvas'), 
+    source: nodes.filter(n => n.category === 'source' && n.name !== 'Canvas'),
     effect: nodes.filter(n => n.category === 'effect' && n.name !== 'Canvas'),
     compositing: nodes.filter(n => n.category === 'compositing' && n.name !== 'Canvas'),
     system: nodes.filter(n => n.category === 'system' && n.name !== 'Canvas')
   };
-  
+
   // Find Canvas node for special positioning
   const canvasDisplayNode = nodes.find(n => n.name === 'Canvas');
-  console.log(`🔍 Canvas node search: found=${!!canvasDisplayNode}`);
+  Logger.debug(`Canvas node search: found=${!!canvasDisplayNode}`);
   if (canvasDisplayNode) {
-    console.log(`🔍 Canvas details: name=${canvasDisplayNode.name}, type=${canvasDisplayNode.type}, category=${canvasDisplayNode.category}, position=(${canvasDisplayNode.x}, ${canvasDisplayNode.y})`);
+    Logger.debug(`Canvas details: name=${canvasDisplayNode.name}, ` +
+                 `type=${canvasDisplayNode.type}, category=${canvasDisplayNode.category}, ` +
+                 `position=(${canvasDisplayNode.x}, ${canvasDisplayNode.y})`);
   }
-  
+
   // Debug: show which nodes are in each category
   Object.keys(nodesByCategory).forEach(category => {
     if (nodesByCategory[category].length > 0) {
-      console.log(`📂 ${category}: ${nodesByCategory[category].map(n => n.name).join(', ')}`);
+      Logger.debug(`${category}: ${nodesByCategory[category].map(n => n.name).join(', ')}`);
     }
   });
-  
+
   // Calculate positions for each category
   Object.keys(nodesByCategory).forEach(category => {
     const categoryNodes = nodesByCategory[category];
     if (categoryNodes.length === 0) return;
-    
+
     const layerConfig = LAYOUT_CONFIG.layers[category];
     const startY = LAYOUT_CONFIG.padding.y;
-    
+
     // Sort nodes intelligently:
     // 1. By connection complexity (more connected nodes higher)
     // 2. By data flow depth (sources that feed many things higher)
     categoryNodes.sort((a, b) => {
       // Count input connections
-      const aInputs = a.inputs.filter(i => i !== null).length + 
+      const aInputs = a.inputs.filter(i => i !== null).length +
                      (a.controlInputs ? a.controlInputs.filter(c => c !== null).length : 0);
-      const bInputs = b.inputs.filter(i => i !== null).length + 
+      const bInputs = b.inputs.filter(i => i !== null).length +
                      (b.controlInputs ? b.controlInputs.filter(c => c !== null).length : 0);
-      
+
       // Count output connections (how many nodes use this node)
-      const aOutputs = nodes.filter(n => 
+      const aOutputs = nodes.filter(n =>
         n.inputs.includes(a) || (n.controlInputs && n.controlInputs.includes(a))
       ).length;
-      const bOutputs = nodes.filter(n => 
+      const bOutputs = nodes.filter(n =>
         n.inputs.includes(b) || (n.controlInputs && n.controlInputs.includes(b))
       ).length;
-      
+
       // Prioritize by total connections, then by outputs (feeding many nodes)
       const aTotalConnections = aInputs + aOutputs;
       const bTotalConnections = bInputs + bOutputs;
-      
+
       if (aTotalConnections !== bTotalConnections) {
         return bTotalConnections - aTotalConnections;
       }
-      
+
       return bOutputs - aOutputs; // More outputs = higher priority
     });
-    
+
     // Create sub-columns for nodes with many connections
     let currentColumn = 0;
     let currentColumnHeight = 0;
     const maxColumnHeight = 4; // Max nodes per sub-column
-    
+
     categoryNodes.forEach((node, index) => {
       if (index > 0 && index % maxColumnHeight === 0) {
         currentColumn++;
         currentColumnHeight = 0;
       }
-      
+
       const x = layerConfig.x + (currentColumn * 180); // Sub-column spacing
       const y = startY + (currentColumnHeight * LAYOUT_CONFIG.nodeSpacing.y);
       currentColumnHeight++;
-      
+
       // Animate to new position
       animateNodeToPosition(node, x, y);
     });
   });
-  
+
   // Position Canvas node just a bit to the right of other nodes (user requirement)
-  console.log(`🎯 Attempting to position Canvas node: ${canvasDisplayNode ? `found ${canvasDisplayNode.name} at (${canvasDisplayNode.x}, ${canvasDisplayNode.y})` : 'NOT FOUND'}`);
+  Logger.debug(`Attempting to position Canvas node: ${canvasDisplayNode ? `found ${canvasDisplayNode.name} at (${canvasDisplayNode.x}, ${canvasDisplayNode.y})` : 'NOT FOUND'}`);
   if (canvasDisplayNode) {
     // Find the actual rightmost and bottommost nodes (not layout config)
     const otherNodes = nodes.filter(n => n !== canvasDisplayNode);
-    
+
     let rightmostX = 250; // Default if no other nodes
     let bottomY = 200;    // Default if no other nodes
-    
+
     if (otherNodes.length > 0) {
       rightmostX = Math.max(...otherNodes.map(n => n.x));
       bottomY = Math.max(...otherNodes.map(n => n.y));
     }
-    
+
     // Position Canvas just a bit to the right and down - much smaller offsets
     const canvasX = rightmostX + 180; // Just a bit to the right (one node width)
     const canvasY = bottomY + 100;    // Just a bit below (less than one node height)
-    
-    console.log(`🖥️ Canvas positioning calculation:
+
+    Logger.debug(`Canvas positioning calculation:
       - Other nodes rightmost X: ${rightmostX}
-      - Other nodes bottom Y: ${bottomY}  
+      - Other nodes bottom Y: ${bottomY}
       - Canvas target position: (${canvasX}, ${canvasY})
       - Canvas current position: (${canvasDisplayNode.x}, ${canvasDisplayNode.y})`);
-    
+
     // FORCE immediate positioning without animation for debugging
     canvasDisplayNode.x = canvasX;
     canvasDisplayNode.y = canvasY;
     canvasDisplayNode.element.style.left = canvasX + 'px';
     canvasDisplayNode.element.style.top = canvasY + 'px';
-    
-    console.log(`🖥️ Canvas position FORCED to (${canvasDisplayNode.x}, ${canvasDisplayNode.y})`);
-    
-    // DEBUG: Set up monitoring to catch when Canvas gets moved
+
+    Logger.debug(`Canvas position FORCED to (${canvasDisplayNode.x}, ${canvasDisplayNode.y})`);
+
     if (canvasDisplayNode.element) {
       // Monitor style property changes
       let currentLeft = canvasDisplayNode.element.style.left;
       let currentTop = canvasDisplayNode.element.style.top;
-      
+
       const checkPositionChange = () => {
         if (canvasDisplayNode.element.style.left !== currentLeft || canvasDisplayNode.element.style.top !== currentTop) {
-          console.log(`🚨 CANVAS MOVED! From (${currentLeft}, ${currentTop}) to (${canvasDisplayNode.element.style.left}, ${canvasDisplayNode.element.style.top})`);
-          console.trace('Canvas position change detected');
+          Logger.error(`CANVAS MOVED! From (${currentLeft}, ${currentTop}) to (${canvasDisplayNode.element.style.left}, ${canvasDisplayNode.element.style.top})`);
+          Logger.debug('Canvas position change detected');
           currentLeft = canvasDisplayNode.element.style.left;
           currentTop = canvasDisplayNode.element.style.top;
         }
       };
-      
+
       // Check position changes frequently
       const monitor = setInterval(checkPositionChange, 50);
       setTimeout(() => clearInterval(monitor), 5000); // Monitor for 5 seconds
     }
   }
-  
+
   // Update connections after layout
   setTimeout(() => {
     updateConnections();
@@ -2441,11 +2287,11 @@ function performAutoLayout() {
 function showAutoLayoutFeedback() {
   const btn = document.getElementById('auto-layout-btn');
   if (!btn) return;
-  
+
   // Add a brief pulse animation
   btn.style.transform = 'scale(1.1)';
   btn.style.boxShadow = '0 0 15px rgba(99, 102, 241, 0.5)';
-  
+
   setTimeout(() => {
     btn.style.transform = '';
     btn.style.boxShadow = '';
@@ -2457,35 +2303,35 @@ function showAutoLayoutFeedback() {
  */
 function animateNodeToPosition(node, targetX, targetY, duration = 500) {
   if (!node.element) return;
-  
+
   const startX = node.x;
   const startY = node.y;
   const startTime = Date.now();
-  
+
   const animate = () => {
     const elapsed = Date.now() - startTime;
     const progress = Math.min(elapsed / duration, 1);
-    
+
     // Smooth easing function
     const easeProgress = 1 - Math.pow(1 - progress, 3);
-    
+
     const currentX = startX + (targetX - startX) * easeProgress;
     const currentY = startY + (targetY - startY) * easeProgress;
-    
+
     // Update node position
     node.x = currentX;
     node.y = currentY;
     node.element.style.left = currentX + 'px';
     node.element.style.top = currentY + 'px';
-    
+
     // Update connections during animation
     updateConnections();
-    
+
     if (progress < 1) {
       requestAnimationFrame(animate);
     }
   };
-  
+
   requestAnimationFrame(animate);
 }
 
@@ -2524,18 +2370,18 @@ function createNode(type, x = 100, y = 100) {
  * Delete a node and clean up connections
  */
 function deleteNode(node) {
-  console.log(`🗑️ Deleting node: ${node.name} (${node.id})`);
-  
+  Logger.debug(`Deleting node: ${node.name} (${node.id})`);
+
   // Prevent double deletion
   if (node.deleted) {
-    console.warn(`Node ${node.name} already deleted - skipping`);
+    Logger.warn(`Node ${node.name} already deleted - skipping`);
     return;
   }
   node.deleted = true;
-  
+
   // SIMPLIFIED: Go back to basic cleanup - the tracking system was problematic
   // cleanupNodeResources(node.id);
-  
+
   // Remove from nodes array
   const index = nodes.indexOf(node);
   if (index !== -1) {
@@ -2550,7 +2396,7 @@ function deleteNode(node) {
         otherNode.inputs[inputIndex] = null;
       }
     });
-    
+
     // Remove control input connections
     if (otherNode.controlInputs) {
       otherNode.controlInputs.forEach((controlNode, controlIndex) => {
@@ -2582,7 +2428,7 @@ function deleteNode(node) {
         gl.deleteFramebuffer(node.fbo);
       }
     } catch (e) {
-      console.warn('Error deleting framebuffer:', e);
+      Logger.warn('Error deleting framebuffer:', e);
     }
   }
   if (node.texture && gl && !webglContextLost) {
@@ -2591,10 +2437,10 @@ function deleteNode(node) {
         gl.deleteTexture(node.texture);
       }
     } catch (e) {
-      console.warn('Error deleting texture:', e);
+      Logger.warn('Error deleting texture:', e);
     }
   }
-  
+
   // Stop video stream if it's a video node
   if (node.video && node.video.srcObject) {
     node.video.srcObject.getTracks().forEach(track => track.stop());
@@ -2604,7 +2450,7 @@ function deleteNode(node) {
   if (node.intervalId) {
     clearInterval(node.intervalId);
   }
-  
+
   // Remove visual element and its event listeners
   if (node.element) {
     // Remove all event listeners on the element
@@ -2618,7 +2464,7 @@ function deleteNode(node) {
     // Set to the first available node, or null if no nodes left
     const newMainOutput = nodes.length > 0 ? nodes[0] : null;
     setMainOutput(newMainOutput);
-    console.log('Main output auto-updated after node deletion:', newMainOutput?.name || 'None');
+    Logger.info('Main output auto-updated after node deletion:', newMainOutput?.name || 'None');
   }
 
   // Clear selection if this was the selected node
@@ -2635,76 +2481,76 @@ function deleteNode(node) {
   node.texture = null;
   node.fbo = null;
   node.video = null;
-  
-  console.log(`✅ Node ${node.name} successfully deleted and cleaned up`);
+
+  Logger.info(`Node ${node.name} successfully deleted and cleaned up`);
 
   // Update UI
   updateConnections();
   updateMainOutputDropdown();
   updateExistingControlInputs(); // Update control input manager
-  
+
   // Trigger auto-layout after node deletion
   if (autoLayoutEnabled) {
     setTimeout(() => performAutoLayout(), 100);
   }
-  
+
   // Save state for undo
   saveState(`Delete ${node.type} Node`);
 }
 
 function allocateNodeFBO(node) {
-  console.log('🔧 PHASE 2: Testing FBO allocation for node:', node.name);
-  
+  Logger.debug('PHASE 2: Testing FBO allocation for node:', node.name);
+
   return safeWebGLOperation(() => {
     const width = canvas.width;
     const height = canvas.height;
-    
+
     // Create texture
     node.texture = gl.createTexture();
     if (!node.texture) {
-      console.error(`Failed to create texture for ${node.name}`);
+      Logger.error(`Failed to create texture for ${node.name}`);
       return false;
     }
-    
+
     gl.bindTexture(gl.TEXTURE_2D, node.texture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     setTextureParams();
-    
+
     // Create framebuffer
     node.fbo = gl.createFramebuffer();
     if (!node.fbo) {
-      console.error(`Failed to create framebuffer for ${node.name}`);
+      Logger.error(`Failed to create framebuffer for ${node.name}`);
       if (gl.isTexture(node.texture)) gl.deleteTexture(node.texture);
       node.texture = null;
       return false;
     }
-    
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, node.fbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, node.texture, 0);
-    
+
     // Check framebuffer completeness
     const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
     if (status !== gl.FRAMEBUFFER_COMPLETE) {
-      console.error(`Framebuffer incomplete for ${node.name}:`, status);
+      Logger.error(`Framebuffer incomplete for ${node.name}:`, status);
       if (gl.isTexture(node.texture)) gl.deleteTexture(node.texture);
       if (gl.isFramebuffer(node.fbo)) gl.deleteFramebuffer(node.fbo);
       node.texture = null;
       node.fbo = null;
       return false;
     }
-    
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    
+
     // Assign shader program
     const programKey = node.type.toLowerCase();
     if (programs[programKey]) {
       node.program = programs[programKey];
     } else {
-      console.error('No shader program found for node type:', node.type);
+      Logger.error('No shader program found for node type:', node.type);
       return false;
     }
-    
-    console.log(`✅ Successfully allocated FBO for ${node.name}`);
+
+    Logger.info(`Successfully allocated FBO for ${node.name}`);
     return true;
   }, `FBO allocation for node ${node.name}`, false);
 }
@@ -2717,7 +2563,7 @@ function setTextureParams() {
 }
 
 function setupVideoNode(node) {
-  console.warn('🚨 Video node setup disabled during WebGL debugging for node:', node.name);
+    Logger.warn('Video node setup disabled during WebGL debugging for node:', node.name);
   // TEMPORARILY DISABLED: WebGL operations during debugging
   node.texture = null;
   return false;
@@ -2792,11 +2638,11 @@ function createNodeElement(node) {
 
   // Add event listeners
   nodeEl.addEventListener('click', (e) => {
-    console.log('Node clicked:', node.name);
+    Logger.debug('Node clicked:', node.name);
     e.stopPropagation();
     selectNode(node);
   });
-  
+
   const enableToggle = nodeEl.querySelector('.node-enabled');
   enableToggle.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -2820,7 +2666,7 @@ function createNodeElement(node) {
       e.stopPropagation();
       const isExpanded = controlToggle.dataset.expanded === 'true';
       const controlPortsList = nodeEl.querySelector('.control-ports-list');
-      
+
       if (isExpanded) {
         // Collapse - hide control ports
         controlPortsList.classList.add('collapsed');
@@ -2832,11 +2678,11 @@ function createNodeElement(node) {
         controlToggle.textContent = '−';
         controlToggle.dataset.expanded = 'true';
       }
-      
+
       // Update connections after collapse/expand
       setTimeout(() => updateConnections(), 50);
     });
-    
+
     // Auto-collapse nodes with >4 control inputs
     if (node.controlInputs && node.controlInputs.length > 4) {
       const controlPortsList = nodeEl.querySelector('.control-ports-list');
@@ -2845,7 +2691,7 @@ function createNodeElement(node) {
       controlToggle.dataset.expanded = 'false';
     }
   }
-  
+
   // Update node width based on actual DOM element
   setTimeout(() => {
     if (node.element) {
@@ -2862,20 +2708,20 @@ function createNodeElement(node) {
 function updateGraphTransform() {
   const container = document.getElementById('nodes-container');
   const svg = document.getElementById('connections-svg');
-  
+
   const transform = `translate(${graphTransform.x}px, ${graphTransform.y}px) scale(${graphTransform.scale})`;
   container.style.transform = transform;
-  
+
   // DON'T transform the SVG - it should remain in screen coordinates
   // The connections will be calculated in screen space
   svg.style.transform = '';
-  
+
   // Update window reference for port calculations
   window.graphTransform = { ...graphTransform };
-  
+
   // Redraw connections with accurate port positions
   updateConnections();
-  
+
   // Update mini-map if it exists
   updateMiniMap();
 }
@@ -2886,13 +2732,13 @@ function updateGraphTransform() {
 function updateMiniMap() {
   const miniMapContent = document.getElementById('mini-map-content');
   const viewport = document.getElementById('mini-map-viewport');
-  
+
   if (!miniMapContent || !viewport) return;
-  
+
   // Clear existing mini-map nodes
   const existingNodes = miniMapContent.querySelectorAll('.mini-node');
   existingNodes.forEach(node => node.remove());
-  
+
   // Calculate mini-map scale
   const mapWidth = 200;
   const mapHeight = 118; // 150 - 32px header
@@ -2900,7 +2746,7 @@ function updateMiniMap() {
   const scaleX = mapWidth / Math.max(graphBounds.width, 800);
   const scaleY = mapHeight / Math.max(graphBounds.height, 600);
   const scale = Math.min(scaleX, scaleY) * 0.8; // Leave some padding
-  
+
   // Add mini-map nodes
   nodes.forEach(node => {
     const miniNode = document.createElement('div');
@@ -2909,7 +2755,7 @@ function updateMiniMap() {
       position: absolute;
       width: ${Math.max(3, 8 * scale)}px;
       height: ${Math.max(3, 6 * scale)}px;
-      background: ${node.category === 'input' ? '#8b5cf6' : 
+      background: ${node.category === 'input' ? '#8b5cf6' :
                    node.category === 'system' ? '#ef4444' : '#6366f1'};
       left: ${(node.x - graphBounds.minX) * scale + 10}px;
       top: ${(node.y - graphBounds.minY) * scale + 10}px;
@@ -2918,18 +2764,18 @@ function updateMiniMap() {
     `;
     miniMapContent.appendChild(miniNode);
   });
-  
+
   // Update viewport indicator
   const centerArea = document.getElementById('center-area');
   const centerWidth = centerArea.clientWidth;
   const centerHeight = centerArea.clientHeight;
-  
+
   // Calculate visible area in graph coordinates
   const viewWidth = centerWidth / graphTransform.scale;
   const viewHeight = centerHeight / graphTransform.scale;
   const viewX = -graphTransform.x / graphTransform.scale;
   const viewY = -graphTransform.y / graphTransform.scale;
-  
+
   viewport.style.left = `${(viewX - graphBounds.minX) * scale + 10}px`;
   viewport.style.top = `${(viewY - graphBounds.minY) * scale + 10}px`;
   viewport.style.width = `${viewWidth * scale}px`;
@@ -2943,16 +2789,16 @@ function calculateGraphBounds() {
   if (nodes.length === 0) {
     return { minX: 0, minY: 0, maxX: 800, maxY: 600, width: 800, height: 600 };
   }
-  
+
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  
+
   nodes.forEach(node => {
     minX = Math.min(minX, node.x);
     minY = Math.min(minY, node.y);
     maxX = Math.max(maxX, node.x + 120); // Approximate node width
     maxY = Math.max(maxY, node.y + 80);  // Approximate node height
   });
-  
+
   return {
     minX: minX - 50,
     minY: minY - 50,
@@ -2967,43 +2813,43 @@ function calculateGraphBounds() {
  * Validate and fix data model consistency
  */
 function validateDataModelConsistency() {
-  console.log('🔍 Validating data model consistency...');
-  
+  Logger.debug('Validating data model consistency...');
+
   // Skip dropdown validation since Canvas logic is different
   // The dropdown now controls what feeds Canvas, not what Canvas is
-  
+
   // Check Final Output Node exists and is properly configured
   const finalOutputNode = nodes.find(n => n.type === 'FinalOutput');
   if (!finalOutputNode) {
-    console.warn('🚨 Final Output Node missing! Creating...');
+    Logger.warn('Final Output Node missing! Creating...');
     createFinalOutputNode();
     return; // Re-validate after creation
   }
-  
+
   // Ensure Final Output Node has proper shader program
   if (!finalOutputNode.program) {
-    console.warn('🚨 Final Output Node missing shader program! Fixing...');
+    Logger.warn('Final Output Node missing shader program! Fixing...');
     finalOutputNode.program = programs.finaloutput || programs.copy;
   }
-  
+
   // Check if Final Output Node has valid input connections
   if (finalOutputNode.inputs[0] === null) {
-    console.log('ℹ️ Final Output Node has no input connection');
+    Logger.info('Final Output Node has no input connection');
   } else if (finalOutputNode.inputs[0] && !finalOutputNode.inputs[0].texture) {
-    console.warn('🚨 Final Output Node input missing texture!', finalOutputNode.inputs[0]);
+    Logger.warn('Final Output Node input missing texture!', finalOutputNode.inputs[0]);
   }
-  
+
   // Validate node input connections
   nodes.forEach(node => {
     node.inputs.forEach((input, index) => {
       if (input && !nodes.find(n => n === input)) {
-        console.warn(`🚨 Invalid input connection found in ${node.name} input ${index}`);
+        Logger.warn(`Invalid input connection found in ${node.name} input ${index}`);
         node.inputs[index] = null;
       }
     });
   });
-  
-  console.log('✅ Data model validation complete');
+
+  Logger.info('Data model validation complete');
 }
 
 /**
@@ -3013,7 +2859,7 @@ function resetGraphZoom() {
   graphTransform.scale = 1;
   graphTransform.x = 0;
   graphTransform.y = 0;
-  
+
   // Apply transform to nodes container
   const nodesContainer = document.getElementById('nodes-container');
   const svg = document.getElementById('connections-svg');
@@ -3022,10 +2868,10 @@ function resetGraphZoom() {
     nodesContainer.style.transform = transform;
     if (svg) svg.style.transform = transform;
   }
-  
+
   // Update window reference for port calculations
   window.graphTransform = { ...graphTransform };
-  
+
   // Update mini-map
   updateMiniMap();
 }
@@ -3035,10 +2881,10 @@ function resetGraphZoom() {
  */
 function updateNodeElement(node) {
   if (!node.element) return;
-  
+
   const iconElement = node.element.querySelector('.node-icon');
   const titleElement = node.element.querySelector('.node-title');
-  
+
   if (iconElement) {
     iconElement.textContent = node.icon || 'help';
   }
@@ -3057,7 +2903,7 @@ function setupGraphInteraction() {
 
   let isDragging = false;
   let isConnecting = false;
-  
+
   // Apply initial transform
   updateGraphTransform();
 
@@ -3080,18 +2926,18 @@ function setupGraphInteraction() {
       // Start node drag
       isDragging = true;
       draggedNode = getNodeFromElement(nodeEl);
-      
+
       // Calculate drag offset in the transformed coordinate space
       const nodeGraphRect = document.getElementById('node-graph').getBoundingClientRect();
       const mouseX = (e.clientX - nodeGraphRect.left - graphTransform.x) / graphTransform.scale;
       const mouseY = (e.clientY - nodeGraphRect.top - graphTransform.y) / graphTransform.scale;
-      
+
       dragOffset.x = mouseX - draggedNode.x;
       dragOffset.y = mouseY - draggedNode.y;
       e.preventDefault();
     }
   });
-  
+
   // Pan with middle mouse or two-finger scroll
   nodeGraph.addEventListener('mousedown', (e) => {
     if (e.button === 1) { // Middle mouse button
@@ -3101,20 +2947,20 @@ function setupGraphInteraction() {
       e.preventDefault();
     }
   });
-  
+
   // Wheel events for panning and zooming
   nodeGraph.addEventListener('wheel', (e) => {
     e.preventDefault();
-    
+
     if (e.ctrlKey || e.metaKey) {
       // Zoom with Ctrl+scroll or pinch
       const rect = nodeGraph.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      
+
       const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1;
       const newScale = Math.max(0.1, Math.min(3, graphTransform.scale * scaleFactor));
-      
+
       // Zoom towards mouse position
       const scaleRatio = newScale / graphTransform.scale;
       graphTransform.x = mouseX - (mouseX - graphTransform.x) * scaleRatio;
@@ -3125,7 +2971,7 @@ function setupGraphInteraction() {
       graphTransform.x -= e.deltaX;
       graphTransform.y -= e.deltaY;
     }
-    
+
     updateGraphTransform();
   });
 
@@ -3138,21 +2984,21 @@ function setupGraphInteraction() {
     } else if (isDragging && draggedNode) {
       // Calculate position in the transformed coordinate space
       const nodeGraphRect = document.getElementById('node-graph').getBoundingClientRect();
-      
+
       // Convert mouse position to container coordinate space (accounting for transform)
       const mouseX = (e.clientX - nodeGraphRect.left - graphTransform.x) / graphTransform.scale;
       const mouseY = (e.clientY - nodeGraphRect.top - graphTransform.y) / graphTransform.scale;
-      
+
       const x = mouseX - dragOffset.x;
       const y = mouseY - dragOffset.y;
-      
+
       // Update node position
       draggedNode.x = Math.max(0, x);
       draggedNode.y = Math.max(0, y);
-      
+
       draggedNode.element.style.left = draggedNode.x + 'px';
       draggedNode.element.style.top = draggedNode.y + 'px';
-      
+
       // Update connections with throttling to improve performance during rapid dragging
       if (connectionUpdateTimer) {
         clearTimeout(connectionUpdateTimer);
@@ -3173,14 +3019,14 @@ function setupGraphInteraction() {
     } else if (isConnecting) {
       const targetElement = e.target.closest('.port');
       const targetNodeEl = e.target.closest('.graph-node');
-      
+
       if (targetElement && targetNodeEl) {
         const targetNode = getNodeFromElement(targetNodeEl);
         const isTargetOutput = targetElement.classList.contains('output');
         const isTargetControl = targetElement.classList.contains('control-input');
         const targetInputIndex = targetElement.dataset.input ? parseInt(targetElement.dataset.input) : null;
         const targetControlIndex = targetElement.dataset.control ? parseInt(targetElement.dataset.control) : null;
-        
+
         // Create connection if valid
         if (connectionStart.isOutput && !isTargetOutput && targetInputIndex !== null) {
           // Output to input connection
@@ -3212,7 +3058,7 @@ function setupGraphInteraction() {
           saveState(`Connect ${targetNode.name} → ${connectionStart.node.name}`);
         }
       }
-      
+
       // Clear temp connection
       if (tempConnection) {
         tempConnection.remove();
@@ -3222,7 +3068,7 @@ function setupGraphInteraction() {
 
     isDragging = false;
     isConnecting = false;
-    
+
     // Clear any pending connection updates and do a final update
     if (connectionUpdateTimer) {
       clearTimeout(connectionUpdateTimer);
@@ -3232,7 +3078,7 @@ function setupGraphInteraction() {
       updateConnections(); // Final update when dragging ends
       saveState(`Move ${draggedNode.name}`); // Save state for undo
     }
-    
+
     draggedNode = null;
     connectionStart = null;
   });
@@ -3262,14 +3108,14 @@ function setupConnectionDragging() {
         controlIndex: path.dataset.controlIndex ? parseInt(path.dataset.controlIndex) : null,
         connectionType: path.dataset.connectionType
       };
-      
+
       dragStart.x = e.clientX;
       dragStart.y = e.clientY;
-      
+
       // Visual feedback - make connection semi-transparent
       path.style.opacity = '0.5';
       path.style.strokeWidth = '3';
-      
+
       e.preventDefault();
       e.stopPropagation();
     }
@@ -3278,10 +3124,10 @@ function setupConnectionDragging() {
   document.addEventListener('mousemove', (e) => {
     if (draggedConnection) {
       const distance = Math.sqrt(
-        Math.pow(e.clientX - dragStart.x, 2) + 
+        Math.pow(e.clientX - dragStart.x, 2) +
         Math.pow(e.clientY - dragStart.y, 2)
       );
-      
+
       // Change visual feedback based on distance
       if (distance > DISCONNECT_THRESHOLD) {
         draggedConnection.path.style.stroke = '#ef4444'; // Red when ready to disconnect
@@ -3296,30 +3142,30 @@ function setupConnectionDragging() {
   document.addEventListener('mouseup', (e) => {
     if (draggedConnection) {
       const distance = Math.sqrt(
-        Math.pow(e.clientX - dragStart.x, 2) + 
+        Math.pow(e.clientX - dragStart.x, 2) +
         Math.pow(e.clientY - dragStart.y, 2)
       );
-      
+
       // Disconnect if dragged far enough
       if (distance > DISCONNECT_THRESHOLD) {
         const outputNode = nodes.find(n => n.id === draggedConnection.outputNodeId);
         const inputNode = nodes.find(n => n.id === draggedConnection.inputNodeId);
-        
+
         if (outputNode && inputNode) {
           if (draggedConnection.connectionType === 'control') {
             // Remove control input connection
             if (inputNode.controlInputs && draggedConnection.controlIndex !== null) {
               inputNode.controlInputs[draggedConnection.controlIndex] = null;
-              console.log(`✅ Disconnected control input: ${outputNode.name} → ${inputNode.name} (control ${draggedConnection.controlIndex})`);
+              Logger.info(`Disconnected control input: ${outputNode.name} → ${inputNode.name} (control ${draggedConnection.controlIndex})`);
             }
           } else {
             // Remove main input connection
             if (draggedConnection.inputIndex !== null) {
               inputNode.inputs[draggedConnection.inputIndex] = null;
-              console.log(`✅ Disconnected: ${outputNode.name} → ${inputNode.name} (input ${draggedConnection.inputIndex})`);
+              Logger.info(`Disconnected: ${outputNode.name} → ${inputNode.name} (input ${draggedConnection.inputIndex})`);
             }
           }
-          
+
           // Update connections and save state
           updateConnections();
           // Trigger auto-layout after disconnection
@@ -3335,7 +3181,7 @@ function setupConnectionDragging() {
         draggedConnection.path.style.stroke = '';
         draggedConnection.path.style.strokeDasharray = '';
       }
-      
+
       draggedConnection = null;
     }
   });
@@ -3347,32 +3193,32 @@ function setupConnectionDragging() {
 function setupMiniMapInteraction() {
   const viewport = document.getElementById('mini-map-viewport');
   const miniMapContent = document.getElementById('mini-map-content');
-  
+
   if (!viewport || !miniMapContent) return;
-  
+
   let isDraggingViewport = false;
   let dragStartX = 0;
   let dragStartY = 0;
   let initialTransformX = 0;
   let initialTransformY = 0;
-  
+
   viewport.addEventListener('mousedown', (e) => {
     isDraggingViewport = true;
     dragStartX = e.clientX;
     dragStartY = e.clientY;
     initialTransformX = graphTransform.x;
     initialTransformY = graphTransform.y;
-    
+
     viewport.style.cursor = 'grabbing';
     e.preventDefault();
   });
-  
+
   document.addEventListener('mousemove', (e) => {
     if (!isDraggingViewport) return;
-    
+
     const deltaX = e.clientX - dragStartX;
     const deltaY = e.clientY - dragStartY;
-    
+
     // Calculate mini-map scale
     const mapWidth = 200;
     const mapHeight = 118;
@@ -3380,28 +3226,28 @@ function setupMiniMapInteraction() {
     const scaleX = mapWidth / Math.max(graphBounds.width, 800);
     const scaleY = mapHeight / Math.max(graphBounds.height, 600);
     const scale = Math.min(scaleX, scaleY) * 0.8;
-    
+
     // Convert mini-map delta to graph coordinates
     const graphDeltaX = -deltaX / scale;
     const graphDeltaY = -deltaY / scale;
-    
+
     // Update graph transform
     graphTransform.x = initialTransformX + graphDeltaX;
     graphTransform.y = initialTransformY + graphDeltaY;
-    
+
     // Apply transform
     updateGraphTransform();
-    
+
     e.preventDefault();
   });
-  
+
   document.addEventListener('mouseup', () => {
     if (isDraggingViewport) {
       isDraggingViewport = false;
       viewport.style.cursor = 'grab';
     }
   });
-  
+
   // Set initial cursor
   viewport.style.cursor = 'grab';
 }
@@ -3413,14 +3259,14 @@ function getNodeFromElement(element) {
 
 function drawTempConnection(e) {
   const svg = document.getElementById('connections-svg');
-  
+
   if (tempConnection) {
     tempConnection.remove();
   }
 
   const startNode = connectionStart.node;
   const svgRect = document.getElementById('connections-svg').getBoundingClientRect();
-  
+
   let startX, startY;
   if (connectionStart.isOutput) {
     const outputPort = startNode.getOutputPort();
@@ -3441,7 +3287,7 @@ function drawTempConnection(e) {
   path.setAttribute('d', d);
   path.setAttribute('class', 'connection');
   path.style.opacity = '0.5';
-  
+
   svg.appendChild(path);
   tempConnection = path;
 }
@@ -3451,7 +3297,7 @@ function createConnectionPath(x1, y1, x2, y2) {
   const controlOffset = Math.abs(dx) * 0.5;
   const cp1x = x1 + controlOffset;
   const cp2x = x2 - controlOffset;
-  
+
   return `M ${x1} ${y1} C ${cp1x} ${y1} ${cp2x} ${y2} ${x2} ${y2}`;
 }
 
@@ -3473,34 +3319,34 @@ function updateConnections() {
         const d = createConnectionPath(outputPort.x, outputPort.y, inputPort.x, inputPort.y);
         path.setAttribute('d', d);
         path.setAttribute('class', 'connection');
-        
+
         // Add connection metadata for drag-to-disconnect
         path.dataset.outputNodeId = inputNode.id;
         path.dataset.inputNodeId = node.id;
         path.dataset.inputIndex = inputIndex;
         path.dataset.connectionType = 'main';
-        
+
         svg.appendChild(path);
       }
     });
-    
+
     // Draw control input connections
     if (node.controlInputs) {
       node.controlInputs.forEach((controlNode, controlIndex) => {
         if (controlNode) {
           const outputPort = controlNode.getOutputPort();
-          
+
           // Get the actual control port element position
           const controlPortElement = node.element?.querySelector(`[data-control="${controlIndex}"]`);
           const controlPortsList = node.element?.querySelector('.control-ports-list');
           const isCollapsed = controlPortsList?.classList.contains('collapsed');
           let controlPort;
-          
+
           if (controlPortElement && !isCollapsed) {
             // Control ports are visible - use actual port position
             const rect = controlPortElement.getBoundingClientRect();
             const svgRect = document.getElementById('connections-svg').getBoundingClientRect();
-            
+
             // Use absolute screen coordinates relative to the SVG
             controlPort = {
               x: rect.left + rect.width / 2 - svgRect.left,
@@ -3523,24 +3369,24 @@ function updateConnections() {
               y: nodeRect.top + 48 + node.inputs.length * 24 + 32 + controlIndex * 20 - svgRect.top
             };
           }
-          
+
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           const d = createConnectionPath(outputPort.x, outputPort.y, controlPort.x, controlPort.y);
           path.setAttribute('d', d);
           path.setAttribute('class', 'connection control-connection');
-          
+
           // Add connection metadata for drag-to-disconnect
           path.dataset.outputNodeId = controlNode.id;
           path.dataset.inputNodeId = node.id;
           path.dataset.controlIndex = controlIndex;
           path.dataset.connectionType = 'control';
-          
+
           svg.appendChild(path);
         }
       });
     }
   });
-  
+
   // Update the canvas display whenever connections change
 }
 
@@ -3548,8 +3394,8 @@ function updateConnections() {
  * Select a node and show its properties
  */
 function selectNode(node) {
-  console.log('🎯 selectNode called with:', node ? node.name : 'null');
-  
+  Logger.debug('selectNode called with:', node ? node.name : 'null');
+
   // Deselect previous
   if (selectedNode && selectedNode.element) {
     selectedNode.element.classList.remove('selected');
@@ -3558,114 +3404,114 @@ function selectNode(node) {
   selectedNode = node;
   if (node && node.element) {
     node.element.classList.add('selected');
-    console.log('✅ Node selected:', node.name, 'Element:', node.element);
+    Logger.info('Node selected:', node.name, 'Element:', node.element);
   }
-  
+
   showNodeProperties(node);
   updateCopyPasteButtons();
 }
 
 function showNodeProperties(node) {
   const panel = document.getElementById('properties-panel');
-  
+
   if (!panel) {
-    console.error('Properties panel not found!');
+    Logger.error('Properties panel not found!');
     return;
   }
-  
+
   if (!node) {
     panel.innerHTML = '<div class="properties-empty">Select a node to edit its properties</div>';
     return;
   }
 
-  console.log('📋 Showing properties for node:', node.name, node.type);
-  
+  Logger.debug('Showing properties for node:', node.name, node.type);
+
   try {
     let html = `<div class="property-group node-header">
       <h4>${node.name}</h4>
       <div class="node-type-badge">${node.type}</div>
     </div>`;
-  
+
   // Get available source nodes for dropdowns (exclude self and nodes that would create cycles)
   const getAvailableSourceNodes = () => {
     return nodes.filter(n => n !== node && !nodeHasDependency(n, node) && n.category !== 'output');
   };
-  
+
   // Get control input nodes
   const getControlInputNodes = () => {
     return nodes.filter(n => n.category === 'input');
   };
-  
+
   // 1. Data Inputs Section (for nodes that accept texture inputs)
   const nodeDefinition = nodeDefinitions[node.type];
   if (nodeDefinition && nodeDefinition.inputs && nodeDefinition.inputs.length > 0) {
     html += `<div class="property-group">
       <h5><span class="section-icon">📥</span> Data Inputs`;
-    
+
     // Add swap button for nodes with exactly 2 inputs
     if (nodeDefinition.inputs.length === 2 && (node.type === 'Layer' || node.type === 'Mix')) {
       html += ` <button class="swap-inputs-btn" title="Swap inputs" style="float: right; font-size: 18px; background: none; border: none; cursor: pointer; color: #999;">⇄</button>`;
     }
-    
+
     html += `</h5>`;
-    
+
     nodeDefinition.inputs.forEach((inputDef, index) => {
       const currentInput = node.inputs[index];
       const inputId = `input-${node.id}-${index}`;
-      
+
       html += `<div class="connection-field">
         <label class="connection-label" for="${inputId}">${inputDef.name}</label>
         <select class="connection-select" data-input-index="${index}" id="${inputId}">
           <option value="">— None —</option>`;
-      
+
       getAvailableSourceNodes().forEach(sourceNode => {
         const selected = currentInput === sourceNode ? 'selected' : '';
         html += `<option value="${sourceNode.id}" ${selected}>${sourceNode.name} (${sourceNode.type})</option>`;
       });
-      
+
       html += `</select>
       </div>`;
     });
-    
+
     html += `</div>`;
   }
-  
+
   // 2. Control Inputs Section (for parameter modulation)
   if (node.category !== 'input' && Object.keys(node.params).length > 0) {
     const mappableParams = Object.entries(node.params).filter(([key, value]) => {
       return typeof value === 'number' || key === 'colorPalette';
     });
-    
+
     if (mappableParams.length > 0) {
       html += `<div class="property-group">
         <h5><span class="section-icon">🎛️</span> Control Inputs</h5>`;
-      
+
       // Show control inputs for each parameter
       const paramNames = Object.keys(node.params).filter(key => {
         const value = node.params[key];
         return typeof value === 'number' || key === 'colorPalette';
       });
-      
+
       paramNames.forEach((paramName, paramIndex) => {
         const currentControl = node.controlInputs ? node.controlInputs[paramIndex] : null;
         const controlId = `control-${node.id}-${paramIndex}`;
-        
+
         html += `<div class="connection-field">
           <label class="connection-label" for="${controlId}">${paramName} control</label>
           <select class="control-select" data-param-index="${paramIndex}" data-param-name="${paramName}" id="${controlId}">
             <option value="">— None —</option>`;
-        
+
         getControlInputNodes().forEach(controlNode => {
           const selected = currentControl === controlNode ? 'selected' : '';
-          const displayName = controlNode.type === 'MIDIInput' ? 
+          const displayName = controlNode.type === 'MIDIInput' ?
             `MIDI CC${controlNode.params.ccNumber}` : controlNode.name;
           html += `<option value="${controlNode.id}" ${selected}>${displayName}</option>`;
         });
-        
+
         html += `</select>
         </div>`;
       });
-      
+
       html += `</div>`;
     }
   }
@@ -3709,14 +3555,14 @@ function showNodeProperties(node) {
     if (key === 'interval' && node.type === 'RandomInput') {
       labelText = 'interval (seconds)';
     }
-    
+
     const inputId = `param-${node.id}-${key}`;
     html += `<div class="property-field">
       <label class="property-label" for="${inputId}">${labelText}</label>`;
-    
+
     if (typeof value === 'number') {
       const constraints = getParameterConstraints(key);
-      const isSlider = constraints && constraints.type === 'number' && 
+      const isSlider = constraints && constraints.type === 'number' &&
                        constraints.min !== undefined && constraints.max !== undefined;
       if (isSlider) {
         const min = getParamMin(key);
@@ -3735,7 +3581,7 @@ function showNodeProperties(node) {
       html += `<input type="checkbox" class="property-input" data-param="${key}" id="${inputId}" ${value ? 'checked' : ''}>`;
     } else if (typeof value === 'string') {
       const constraints = getParameterConstraints(key);
-      
+
       if (key === 'color' || (constraints && constraints.type === 'color')) {
         html += `<input type="color" class="property-input" data-param="${key}" id="${inputId}" value="${value}">`;
       } else if (constraints && constraints.values) {
@@ -3743,7 +3589,7 @@ function showNodeProperties(node) {
         html += `<select class="property-input" data-param="${key}" id="${inputId}">
           ${constraints.values.map(option => `<option value="${option}" ${option === value ? 'selected' : ''}>${option.charAt(0).toUpperCase() + option.slice(1)}</option>`).join('')}
         </select>`;
-        
+
         // Add color palette preview for colorPalette
         if (key === 'colorPalette') {
           html += `<div class="color-palette-preview" data-palette="${value}">
@@ -3754,20 +3600,20 @@ function showNodeProperties(node) {
         html += `<input type="text" class="property-input" data-param="${key}" id="${inputId}" value="${value}">`;
       }
     }
-    
-    
+
+
       html += '</div>';
     });
-    
+
     html += `</div>`;
   }
-  
+
   // 4. Visual Preview Section (show input/output previews)
   if (node.category !== 'output') {
     html += `<div class="property-group">
       <h5><span class="section-icon">👁️</span> Visual Preview</h5>
       <div class="preview-container">`;
-    
+
     // Input previews
     if (nodeDefinition && nodeDefinition.inputs && nodeDefinition.inputs.length > 0) {
       html += `<div class="preview-inputs">`;
@@ -3775,8 +3621,8 @@ function showNodeProperties(node) {
         const hasInput = node.inputs[index] && node.inputs[index].texture;
         html += `<div class="preview-item">
           <div class="preview-label">${inputDef.name}</div>
-          <canvas class="preview-canvas ${hasInput ? '' : 'empty'}" 
-                  data-preview-type="input" 
+          <canvas class="preview-canvas ${hasInput ? '' : 'empty'}"
+                  data-preview-type="input"
                   data-input-index="${index}"
                   width="80" height="60">
           </canvas>
@@ -3784,51 +3630,51 @@ function showNodeProperties(node) {
       });
       html += `</div>`;
     }
-    
+
     // Output preview
     html += `<div class="preview-output">
       <div class="preview-item">
         <div class="preview-label">Output</div>
-        <canvas class="preview-canvas" 
+        <canvas class="preview-canvas"
                 data-preview-type="output"
                 width="120" height="90">
         </canvas>
       </div>
     </div>`;
-    
+
     html += `</div></div>`;
   }
-  
+
   // 5. Output Connections Section (show what nodes use this as input)
   const outputConnections = nodes.filter(n => n.inputs.includes(node));
   if (outputConnections.length > 0) {
     html += `<div class="property-group">
       <h5><span class="section-icon">📤</span> Output Connections</h5>
       <div class="output-connections-list">`;
-    
+
     outputConnections.forEach(targetNode => {
       const inputIndex = targetNode.inputs.indexOf(node);
       const inputDef = nodeDefinitions[targetNode.type]?.inputs?.[inputIndex];
       const inputName = inputDef ? inputDef.name : `Input ${inputIndex + 1}`;
-      
+
       html += `<div class="output-connection-item">
         <span class="connection-arrow">→</span>
         <span class="connection-target">${targetNode.name}</span>
         <span class="connection-input">(${inputName})</span>
       </div>`;
     });
-    
+
     html += `</div></div>`;
   }
 
   panel.innerHTML = html;
-  
+
   } catch (error) {
-    console.error('Error in showNodeProperties:', error);
+    Logger.error('Error in showNodeProperties:', error);
     panel.innerHTML = '<div class="properties-empty">Error loading node properties</div>';
     return;
   }
-  
+
   // Start rendering previews
   if (node.category !== 'output') {
     requestAnimationFrame(() => updateNodePreviews(node));
@@ -3840,10 +3686,10 @@ function showNodeProperties(node) {
     input.addEventListener('input', (e) => {
       const param = e.target.dataset.param;
       let value = e.target.value;
-      
+
       if (e.target.type === 'number' || e.target.type === 'range') {
         value = parseFloat(value);
-        
+
         // Sync between slider and number input for dual controls
         if (e.target.classList.contains('property-slider') || e.target.classList.contains('property-number')) {
           const container = e.target.closest('.dual-input-container');
@@ -3860,7 +3706,7 @@ function showNodeProperties(node) {
       } else if (e.target.type === 'checkbox') {
         value = e.target.checked;
       }
-      
+
       // Validate parameter value before setting
       const validation = validateParameter(param, value);
       if (!validation.isValid && validation.error) {
@@ -3873,15 +3719,15 @@ function showNodeProperties(node) {
           input.title = '';
         }, 3000);
       }
-      
+
       // Use validated/corrected value
       node.params[param] = validation.value;
-      
+
       // Debug logging for Layer blend mode changes
       if (node.type === 'Layer' && (param === 'blendMode' || param === 'opacity')) {
         Logger.info(`Layer ${node.name} ${param} changed to: ${validation.value}`);
       }
-      
+
       // Update input to show corrected value if it was changed
       if (validation.value !== value) {
         e.target.value = validation.value;
@@ -3896,20 +3742,20 @@ function showNodeProperties(node) {
           }
         }
       }
-      
+
       markUnsaved();
-      
+
       // Debounced save state for undo
       clearTimeout(parameterChangeTimeout);
       parameterChangeTimeout = setTimeout(() => {
         saveState(`Change ${param}`);
       }, 1000); // Wait 1 second after last change
-      
+
       // Update color palette preview if it's a colorPalette parameter
       if (param === 'colorPalette') {
         const preview = panel.querySelector('.color-palette-preview');
         if (preview) {
-          preview.innerHTML = colorPalettes[value].map(color => 
+          preview.innerHTML = colorPalettes[value].map(color =>
             `<div class="color-swatch" style="background-color: ${color}"></div>`
           ).join('');
         }
@@ -3922,37 +3768,37 @@ function showNodeProperties(node) {
     select.addEventListener('change', (e) => {
       const inputIndex = parseInt(e.target.dataset.inputIndex);
       const sourceNodeId = e.target.value;
-      
+
       if (sourceNodeId) {
         const sourceNode = nodes.find(n => n.id === sourceNodeId);
         if (sourceNode) {
           node.inputs[inputIndex] = sourceNode;
-          console.log(`Connected ${sourceNode.name} to ${node.name} input ${inputIndex}`);
+          Logger.info(`Connected ${sourceNode.name} to ${node.name} input ${inputIndex}`);
         }
       } else {
         node.inputs[inputIndex] = null;
-        console.log(`Disconnected input ${inputIndex} from ${node.name}`);
+        Logger.info(`Disconnected input ${inputIndex} from ${node.name}`);
       }
-      
+
       updateConnections();
       markUnsaved();
       saveState(`Change input connection`);
     });
   });
-  
+
   // Add event listener for swap inputs button
   const swapBtn = panel.querySelector('.swap-inputs-btn');
   if (swapBtn) {
     swapBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      
+
       // Swap the inputs
       const temp = node.inputs[0];
       node.inputs[0] = node.inputs[1];
       node.inputs[1] = temp;
-      
+
       Logger.info(`Swapped inputs for ${node.name}`);
-      
+
       // Update the UI to reflect the swap
       showNodeProperties(node);
       updateConnections();
@@ -3960,30 +3806,30 @@ function showNodeProperties(node) {
       saveState('Swap inputs');
     });
   }
-  
+
   // Add event listeners for control input connections
   panel.querySelectorAll('.control-select').forEach(select => {
     select.addEventListener('change', (e) => {
       const paramIndex = parseInt(e.target.dataset.paramIndex);
       const paramName = e.target.dataset.paramName;
       const controlNodeId = e.target.value;
-      
+
       // Initialize controlInputs array if needed
       if (!node.controlInputs) {
         node.controlInputs = [];
       }
-      
+
       if (controlNodeId) {
         const controlNode = nodes.find(n => n.id === controlNodeId);
         if (controlNode) {
           node.controlInputs[paramIndex] = controlNode;
-          console.log(`Connected ${controlNode.name} to ${node.name} ${paramName} control`);
+          Logger.info(`Connected ${controlNode.name} to ${node.name} ${paramName} control`);
         }
       } else {
         node.controlInputs[paramIndex] = null;
-        console.log(`Disconnected ${paramName} control from ${node.name}`);
+        Logger.info(`Disconnected ${paramName} control from ${node.name}`);
       }
-      
+
       updateConnections();
       markUnsaved();
       saveState(`Change control connection`);
@@ -4007,13 +3853,13 @@ function showNodeProperties(node) {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      
+
       const type = e.currentTarget.dataset.type;
       const key = e.currentTarget.dataset.key;
       const index = e.currentTarget.dataset.index;
-      
-      console.log('Removing mapping:', { type, key, index }); // Debug log
-      
+
+      Logger.debug('Removing mapping:', { type, key, index });
+
       if (type === 'midi') {
         delete controlInputs.midi[key];
       } else if (type === 'audio') {
@@ -4045,8 +3891,8 @@ function showNodeProperties(node) {
           }
         }
       }
-      
-      console.log('✅ Mapping removed successfully');
+
+      Logger.info('Mapping removed successfully');
       showNodeProperties(node); // Refresh the entire properties panel
       saveState('Remove Control Mapping');
     });
@@ -4059,31 +3905,31 @@ function showNodeProperties(node) {
       if (!audioEnabled) {
         try {
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
-          
-          const stream = await navigator.mediaDevices.getUserMedia({ 
+
+          const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
               echoCancellation: false,
               noiseSuppression: false,
               autoGainControl: false
             }
           });
-          
+
           microphone = audioContext.createMediaStreamSource(stream);
           analyser = audioContext.createAnalyser();
           analyser.fftSize = 2048;
           analyser.smoothingTimeConstant = 0.3;
-          
+
           microphone.connect(analyser);
           frequencyData = new Uint8Array(analyser.frequencyBinCount);
           audioEnabled = true;
-          
+
           audioBtn.textContent = 'Audio Input Active';
           audioBtn.disabled = true;
           audioBtn.style.background = '#10b981';
-          
-          console.log('✅ Audio input enabled via node properties');
+
+          Logger.info('Audio input enabled via node properties');
         } catch (error) {
-          console.error('Audio initialization failed:', error);
+          Logger.error('Audio initialization failed:', error);
           audioBtn.textContent = 'Audio Access Denied';
           audioBtn.style.background = '#ef4444';
         }
@@ -4097,31 +3943,31 @@ function showNodeProperties(node) {
     cameraBtn.addEventListener('click', async () => {
       if (!cameraEnabled) {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ 
+          const stream = await navigator.mediaDevices.getUserMedia({
             video: { width: 320, height: 240 } // Low resolution for analysis
           });
-          
+
           // Create hidden video element
           cameraVideoElement = document.createElement('video');
           cameraVideoElement.srcObject = stream;
           cameraVideoElement.play();
           cameraVideoElement.style.display = 'none';
           document.body.appendChild(cameraVideoElement);
-          
+
           // Create canvas for frame analysis
           cameraCanvas = document.createElement('canvas');
           cameraCanvas.width = 320;
           cameraCanvas.height = 240;
           cameraContext = cameraCanvas.getContext('2d');
-          
+
           cameraEnabled = true;
           cameraBtn.textContent = 'Camera Input Active';
           cameraBtn.disabled = true;
           cameraBtn.style.background = '#10b981';
-          
-          console.log('✅ Camera input enabled via node properties');
+
+          Logger.info('Camera input enabled via node properties');
         } catch (error) {
-          console.error('Camera access error:', error);
+          Logger.error('Camera access error:', error);
           cameraBtn.textContent = 'Camera Access Denied';
           cameraBtn.style.background = '#ef4444';
         }
@@ -4136,34 +3982,34 @@ function showNodeProperties(node) {
 function startMIDIMapping(node, param) {
   const originalText = document.getElementById('midi-cc').textContent;
   document.getElementById('midi-cc').textContent = 'Move a MIDI control...';
-  
+
   const tempHandler = (msg) => {
     const data = msg.data;
     if ((data[0] & 0xF0) === 0xB0) {
       const ccNum = data[1];
-      
+
       // Create MIDI mapping
       const min = getParamMin(param);
       const max = getParamMax(param);
-      
+
       controlInputs.midi[ccNum] = {
         nodeId: node.id,
         param: param,
         min: min,
         max: max
       };
-      
+
       document.getElementById('midi-cc').textContent = `CC${ccNum} → ${param}`;
-      
+
       // Remove temporary handler
       if (midiIn) {
         midiIn.onmidimessage = handleMIDIMessage;
       }
-      
+
       updateControlMappingDisplay(node);
     }
   };
-  
+
   if (midiIn) {
     midiIn.onmidimessage = tempHandler;
   }
@@ -4176,10 +4022,10 @@ function createAudioMapping(node, param, audioBand) {
   if (!controlInputs.audio[audioBand]) {
     controlInputs.audio[audioBand] = [];
   }
-  
+
   const min = getParamMin(param);
   const max = getParamMax(param);
-  
+
   // Remove any existing mappings for this node/param combination from ALL bands
   Object.keys(controlInputs.audio).forEach(band => {
     controlInputs.audio[band] = controlInputs.audio[band].filter(
@@ -4190,12 +4036,12 @@ function createAudioMapping(node, param, audioBand) {
       delete controlInputs.audio[band];
     }
   });
-  
+
   // Re-initialize the target band if it was deleted
   if (!controlInputs.audio[audioBand]) {
     controlInputs.audio[audioBand] = [];
   }
-  
+
   // Add new mapping
   controlInputs.audio[audioBand].push({
     nodeId: node.id,
@@ -4203,8 +4049,8 @@ function createAudioMapping(node, param, audioBand) {
     min: min,
     max: max
   });
-  
-  console.log('Created audio mapping:', { audioBand, nodeId: node.id, param, min, max }); // Debug log
+
+  Logger.debug('Created audio mapping:', { audioBand, nodeId: node.id, param, min, max });
   updateControlMappingDisplay(node);
 }
 
@@ -4219,7 +4065,7 @@ function removeAllMappingsForParam(nodeId, param) {
       delete controlInputs.midi[ccNum];
     }
   });
-  
+
   // Remove from audio
   Object.keys(controlInputs.audio).forEach(band => {
     controlInputs.audio[band] = controlInputs.audio[band].filter(
@@ -4229,7 +4075,7 @@ function removeAllMappingsForParam(nodeId, param) {
       delete controlInputs.audio[band];
     }
   });
-  
+
   // Remove from color
   Object.keys(controlInputs.color).forEach(component => {
     controlInputs.color[component] = controlInputs.color[component].filter(
@@ -4239,7 +4085,7 @@ function removeAllMappingsForParam(nodeId, param) {
       delete controlInputs.color[component];
     }
   });
-  
+
   // Remove from cursor
   Object.keys(controlInputs.cursor).forEach(component => {
     controlInputs.cursor[component] = controlInputs.cursor[component].filter(
@@ -4249,7 +4095,7 @@ function removeAllMappingsForParam(nodeId, param) {
       delete controlInputs.cursor[component];
     }
   });
-  
+
   // Remove from camera
   Object.keys(controlInputs.camera).forEach(component => {
     controlInputs.camera[component] = controlInputs.camera[component].filter(
@@ -4259,9 +4105,9 @@ function removeAllMappingsForParam(nodeId, param) {
       delete controlInputs.camera[component];
     }
   });
-  
-  
-  console.log('Removed all mappings for:', { nodeId, param }); // Debug log
+
+
+  Logger.debug('Removed all mappings for:', { nodeId, param });
 }
 
 /**
@@ -4271,15 +4117,15 @@ function createColorMapping(node, param, colorComponent) {
   if (!controlInputs.color[colorComponent]) {
     controlInputs.color[colorComponent] = [];
   }
-  
+
   const min = getParamMin(param);
   const max = getParamMax(param);
-  
+
   // Remove existing mapping for this node/param combination
   controlInputs.color[colorComponent] = controlInputs.color[colorComponent].filter(
     mapping => !(mapping.nodeId === node.id && mapping.param === param)
   );
-  
+
   // Add new mapping
   controlInputs.color[colorComponent].push({
     nodeId: node.id,
@@ -4287,7 +4133,7 @@ function createColorMapping(node, param, colorComponent) {
     min: min,
     max: max
   });
-  
+
   updateControlMappingDisplay(node);
 }
 
@@ -4298,10 +4144,10 @@ function createCursorMapping(node, param, cursorComponent) {
   if (!controlInputs.cursor[cursorComponent]) {
     controlInputs.cursor[cursorComponent] = [];
   }
-  
+
   const min = getParamMin(param);
   const max = getParamMax(param);
-  
+
   // Remove existing mapping for this node/param combination from ALL cursor components
   Object.keys(controlInputs.cursor).forEach(component => {
     controlInputs.cursor[component] = controlInputs.cursor[component].filter(
@@ -4311,12 +4157,12 @@ function createCursorMapping(node, param, cursorComponent) {
       delete controlInputs.cursor[component];
     }
   });
-  
+
   // Re-initialize the target component if it was deleted
   if (!controlInputs.cursor[cursorComponent]) {
     controlInputs.cursor[cursorComponent] = [];
   }
-  
+
   // Add new mapping
   controlInputs.cursor[cursorComponent].push({
     nodeId: node.id,
@@ -4324,8 +4170,8 @@ function createCursorMapping(node, param, cursorComponent) {
     min: min,
     max: max
   });
-  
-  console.log('Created cursor mapping:', { cursorComponent, nodeId: node.id, param, min, max });
+
+  Logger.debug('Created cursor mapping:', { cursorComponent, nodeId: node.id, param, min, max });
   updateControlMappingDisplay(node);
 }
 
@@ -4336,10 +4182,10 @@ function createCameraMapping(node, param, cameraComponent) {
   if (!controlInputs.camera[cameraComponent]) {
     controlInputs.camera[cameraComponent] = [];
   }
-  
+
   const min = getParamMin(param);
   const max = getParamMax(param);
-  
+
   // Remove existing mapping for this node/param combination from ALL camera components
   Object.keys(controlInputs.camera).forEach(component => {
     controlInputs.camera[component] = controlInputs.camera[component].filter(
@@ -4349,12 +4195,12 @@ function createCameraMapping(node, param, cameraComponent) {
       delete controlInputs.camera[component];
     }
   });
-  
+
   // Re-initialize the target component if it was deleted
   if (!controlInputs.camera[cameraComponent]) {
     controlInputs.camera[cameraComponent] = [];
   }
-  
+
   // Add new mapping
   controlInputs.camera[cameraComponent].push({
     nodeId: node.id,
@@ -4362,8 +4208,8 @@ function createCameraMapping(node, param, cameraComponent) {
     min: min,
     max: max
   });
-  
-  console.log('Created camera mapping:', { cameraComponent, nodeId: node.id, param, min, max });
+
+  Logger.debug('Created camera mapping:', { cameraComponent, nodeId: node.id, param, min, max });
   updateControlMappingDisplay(node);
 }
 
@@ -4374,9 +4220,9 @@ function createCameraMapping(node, param, cameraComponent) {
 function updateControlMappingDisplay(node) {
   const container = document.getElementById('control-mappings');
   if (!container) return;
-  
+
   let html = '';
-  
+
   // Show MIDI mappings
   Object.entries(controlInputs.midi).forEach(([ccNum, mapping]) => {
     if (mapping.nodeId === node.id) {
@@ -4386,7 +4232,7 @@ function updateControlMappingDisplay(node) {
       </div>`;
     }
   });
-  
+
   // Show audio mappings
   Object.entries(controlInputs.audio).forEach(([bandName, mappings]) => {
     mappings.forEach((mapping, index) => {
@@ -4435,25 +4281,25 @@ function updateControlMappingDisplay(node) {
     });
   });
 
-  
+
   if (html === '') {
     html = '<div class="mapping-empty">No control inputs mapped</div>';
   }
-  
+
   container.innerHTML = html;
-  
+
   // Add remove event listeners
   container.querySelectorAll('.remove-mapping').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      
+
       const type = e.currentTarget.dataset.type;
       const key = e.currentTarget.dataset.key;
       const index = e.currentTarget.dataset.index;
-      
-      console.log('Removing mapping:', { type, key, index }); // Debug log
-      
+
+      Logger.debug('Removing mapping:', { type, key, index });
+
       if (type === 'midi') {
         delete controlInputs.midi[key];
       } else if (type === 'audio') {
@@ -4485,10 +4331,10 @@ function updateControlMappingDisplay(node) {
           }
         }
       }
-      
+
       // Refresh the control mapping display
       updateControlMappingDisplay(node);
-      
+
       // Also refresh the properties panel if this node is selected
       if (selectedNode === node) {
         showNodeProperties(node);
@@ -4502,17 +4348,17 @@ function updateControlMappingDisplay(node) {
  */
 function updateNodePreviews(node) {
   if (!node || selectedNode !== node) return;
-  
+
   const panel = document.getElementById('properties-panel');
   if (!panel) return;
-  
+
   // Update input previews
   const inputCanvases = panel.querySelectorAll('[data-preview-type="input"]');
   inputCanvases.forEach(canvas => {
     const ctx = canvas.getContext('2d');
     const inputIndex = parseInt(canvas.dataset.inputIndex);
     const inputNode = node.inputs[inputIndex];
-    
+
     if (inputNode && inputNode.texture && gl.isTexture(inputNode.texture)) {
       // Draw the input texture
       drawTextureToCanvas(inputNode.texture, canvas);
@@ -4527,13 +4373,13 @@ function updateNodePreviews(node) {
       ctx.fillText('No Input', canvas.width/2, canvas.height/2);
     }
   });
-  
+
   // Update output preview
   const outputCanvas = panel.querySelector('[data-preview-type="output"]');
   if (outputCanvas && node.texture && gl.isTexture(node.texture)) {
     drawTextureToCanvas(node.texture, outputCanvas);
   }
-  
+
   // Continue updating if node is still selected
   if (selectedNode === node) {
     requestAnimationFrame(() => updateNodePreviews(node));
@@ -4547,20 +4393,20 @@ function drawTextureToCanvas(texture, canvas) {
   const ctx = canvas.getContext('2d');
   const canvasWidth = canvas.width;
   const canvasHeight = canvas.height;
-  
+
   // Save current WebGL state
   const currentProgram = gl.getParameter(gl.CURRENT_PROGRAM);
   const currentFramebuffer = gl.getParameter(gl.FRAMEBUFFER_BINDING);
   const currentViewport = gl.getParameter(gl.VIEWPORT);
-  
+
   try {
     // Use the copy shader to render the texture
     gl.useProgram(programs.copy);
-    
+
     // Create a temporary framebuffer
     const tempFb = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, tempFb);
-    
+
     // Create a temporary texture to render to
     const tempTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tempTexture);
@@ -4569,33 +4415,33 @@ function drawTextureToCanvas(texture, canvas) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    
+
     // Attach the texture to framebuffer
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tempTexture, 0);
-    
+
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE) {
       // Set viewport to match preview size
       gl.viewport(0, 0, canvasWidth, canvasHeight);
-      
+
       // Bind the source texture
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, texture);
-      
+
       // Set uniform
       const texLoc = gl.getUniformLocation(programs.copy, 'u_texture');
       gl.uniform1i(texLoc, 0);
-      
+
       // Render the texture to our temporary framebuffer
       bindQuad();
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      
+
       // Read pixels from the temporary framebuffer
       const pixels = new Uint8Array(canvasWidth * canvasHeight * 4);
       gl.readPixels(0, 0, canvasWidth, canvasHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-      
+
       // Create ImageData and draw to canvas
       const imageData = ctx.createImageData(canvasWidth, canvasHeight);
-      
+
       // Flip vertically while copying (WebGL has Y axis flipped)
       for (let y = 0; y < canvasHeight; y++) {
         for (let x = 0; x < canvasWidth; x++) {
@@ -4607,16 +4453,16 @@ function drawTextureToCanvas(texture, canvas) {
           imageData.data[dstIndex + 3] = pixels[srcIndex + 3];
         }
       }
-      
+
       ctx.putImageData(imageData, 0, 0);
     }
-    
+
     // Clean up temporary resources
     gl.deleteTexture(tempTexture);
     gl.deleteFramebuffer(tempFb);
-    
+
   } catch (error) {
-    console.error('Error drawing texture to canvas:', error);
+    Logger.error('Error drawing texture to canvas:', error);
     // Show error state
     ctx.fillStyle = '#440000';
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -4665,39 +4511,39 @@ function getSortedNodesForRendering() {
   const visited = new Set();
   const visiting = new Set();
   const result = [];
-  
+
   function visit(node) {
     if (visiting.has(node.id)) {
       // Circular dependency detected - skip this node to avoid infinite loop
-      console.warn(`Circular dependency detected involving node ${node.name}`);
+      Logger.warn(`Circular dependency detected involving node ${node.name}`);
       return;
     }
-    
+
     if (visited.has(node.id)) {
       return;
     }
-    
+
     visiting.add(node.id);
-    
+
     // Visit all dependencies first
     node.inputs.forEach(inputNode => {
       if (inputNode) {
         visit(inputNode);
       }
     });
-    
+
     visiting.delete(node.id);
     visited.add(node.id);
     result.push(node);
   }
-  
+
   // Visit all nodes
   nodes.forEach(node => {
     if (!visited.has(node.id)) {
       visit(node);
     }
   });
-  
+
   return result;
 }
 
@@ -4706,7 +4552,7 @@ function getSortedNodesForRendering() {
  */
 function updateInputNodeValue(node, time) {
   let value = 0.0;
-  
+
   switch (node.type) {
     case 'MIDIInput':
       const ccNum = node.params.ccNumber;
@@ -4714,7 +4560,7 @@ function updateInputNodeValue(node, time) {
         value = controlInputs.midi[ccNum].lastValue || 0.0;
       }
       break;
-      
+
     case 'AudioInput':
       if (audioEnabled && frequencyData) {
         // Get audio level for the selected band
@@ -4722,7 +4568,7 @@ function updateInputNodeValue(node, time) {
         value = getAudioLevel(band);
       }
       break;
-      
+
     case 'CursorInput':
       const component = node.params.component;
       if (component === 'x') {
@@ -4731,17 +4577,17 @@ function updateInputNodeValue(node, time) {
         value = (mousePos.y / canvas.height);
       }
       break;
-      
+
     case 'CameraInput':
       // For now, just oscillate as a demo
       value = (Math.sin(time * 2) + 1) / 2;
       break;
-      
+
     case 'RandomInput':
       // Generate random values at the specified interval (in seconds)
       const intervalSeconds = node.params.interval || 1.0;
       const intervalMs = intervalSeconds * 1000; // Convert seconds to milliseconds
-      
+
       // Ensure random value and last update time are initialized (should be done in constructor)
       if (!node.randomValue) {
         node.randomValue = Math.random();
@@ -4749,22 +4595,22 @@ function updateInputNodeValue(node, time) {
       if (!node.lastRandomUpdate) {
         node.lastRandomUpdate = Date.now();
       }
-      
+
       const now = Date.now();
       const timeSinceLastUpdate = now - node.lastRandomUpdate;
       if (timeSinceLastUpdate >= intervalMs) {
         node.randomValue = Math.random();
         node.lastRandomUpdate = now;
       }
-      
+
       value = node.randomValue;
       break;
   }
-  
+
   // Map value to node's min/max range
   const mappedValue = node.params.min + (value * (node.params.max - node.params.min));
   node.currentValue = mappedValue;
-  
+
   // Update the properties panel display if this node is selected and it's a RandomInput
   if (node.type === 'RandomInput' && selectedNode === node) {
     const currentValueDisplay = document.querySelector('.current-value-display');
@@ -4781,18 +4627,18 @@ function startRenderLoop() {
   function render() {
     // Skip rendering if WebGL is not healthy
     if (!isWebGLHealthy()) {
-      console.warn('Skipping render frame - WebGL not healthy');
+      Logger.warn('Skipping render frame - WebGL not healthy');
       if (!webglContextLost) {
         animationFrameId = requestAnimationFrame(render);
       }
       return;
     }
-    
+
     animationFrameId = requestAnimationFrame(render);
-    
+
     try {
       const elapsed = (Date.now() - startTime) / 1000.0;
-      
+
       // Clear screen
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
@@ -4800,22 +4646,22 @@ function startRenderLoop() {
 
       // Render nodes in dependency order
       const sortedNodes = getSortedNodesForRendering();
-      
-      
+
+
       sortedNodes.forEach(node => {
         if (!node.enabled) return;
         if (node.groupName && groups[node.groupName] && !groups[node.groupName].enabled) return;
-        
+
         // PREVENT FEEDBACK LOOP: Don't render FinalOutput node in the main loop
         // It will be handled separately in renderFinalOutput()
         if (node.type === 'FinalOutput') {
           return;
         }
-        
+
         try {
           renderNode(node, elapsed);
         } catch (error) {
-          console.error(`Error rendering node ${node.name}:`, error);
+          Logger.error(`Error rendering node ${node.name}:`, error);
         }
       });
 
@@ -4826,17 +4672,17 @@ function startRenderLoop() {
 
       // Render final output to canvas
       renderFinalOutput();
-      
+
     } catch (error) {
-      console.error('Error in render loop:', error);
+      Logger.error('Error in render loop:', error);
     }
   }
-  
+
   // Only start render loop if WebGL is healthy
   if (isWebGLHealthy()) {
     render();
   } else {
-    console.warn('Cannot start render loop - WebGL not healthy');
+    Logger.warn('Cannot start render loop - WebGL not healthy');
   }
 }
 
@@ -4846,36 +4692,36 @@ function startRenderLoop() {
 function renderFinalOutput() {
   const finalOutputNode = nodes.find(n => n.type === 'FinalOutput');
   if (!finalOutputNode) {
-    console.warn('🚨 No FinalOutput node found');
+    Logger.warn('No FinalOutput node found');
     return;
   }
-  
+
   const connectedNode = finalOutputNode.inputs[0];
   if (!connectedNode) {
-    console.warn('🚨 FinalOutput has no input connected');
+    Logger.warn('FinalOutput has no input connected');
     return;
   }
-  
+
   if (!connectedNode.texture) {
-    console.warn(`🚨 Connected node "${connectedNode.name}" has no texture`);
+    Logger.warn(`Connected node "${connectedNode.name}" has no texture`);
     return;
   }
-  
-  console.log(`🖥️ Rendering final output from: ${connectedNode.name} (${connectedNode.type})`);
-  
+
+  Logger.debug(`Rendering final output from: ${connectedNode.name} (${connectedNode.type})`);
+
   // Validate connected node's texture
   if (!gl.isTexture(connectedNode.texture)) {
-    console.error(`🚨 Connected node "${connectedNode.name}" has invalid texture`);
+    Logger.error(`Connected node "${connectedNode.name}" has invalid texture`);
     return;
   }
-  
+
   gl.useProgram(programs.copy);
-  
+
   const textureLocation = gl.getUniformLocation(programs.copy, "u_texture");
   if (textureLocation) {
     gl.uniform1i(textureLocation, 0);
   }
-  
+
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, finalOutputNode.inputs[0].texture);
   bindQuad();
@@ -4889,17 +4735,17 @@ function renderNode(node, time) {
   if (node.deleted) {
     return;
   }
-  
+
   if (!node.program && node.type !== 'Video' && node.category !== 'input') {
-    console.warn(`🚨 SKIPPING ${node.name} (${node.type}): No program assigned`);
+    Logger.warn(`SKIPPING ${node.name} (${node.type}): No program assigned`);
     return;
   }
-  
+
   // Debug log for Layer and Mix nodes
   if (node.type === 'Layer' || node.type === 'Mix') {
     const validInputs = node.inputs.filter(n => n && !n.deleted && n.texture);
     Logger.debug(`Rendering ${node.type} node: ${node.name}, valid inputs: ${validInputs.length}/2 [${validInputs.map(n => n.name).join(', ')}]`);
-    
+
     // Special debugging for Layer nodes
     if (node.type === 'Layer') {
       const layerInfo = {
@@ -4912,12 +4758,12 @@ function renderNode(node, time) {
         input2HasTexture: !!node.inputs[1]?.texture,
         hasProgram: !!node.program
       };
-      
+
       Logger.debug(`Layer ${node.name} details:`, layerInfo);
       updateDebugPanel('layer', layerInfo);
     }
   }
-  
+
   if (node.type === 'Video') {
     if (node.video && node.video.readyState === node.video.HAVE_ENOUGH_DATA) {
       gl.bindTexture(gl.TEXTURE_2D, node.texture);
@@ -4936,7 +4782,7 @@ function renderNode(node, time) {
     updateInputNodeValue(node, time);
     return; // Input nodes don't need WebGL rendering
   }
-  
+
   // Apply control input values to node parameters
   if (node.controlInputs) {
     node.controlInputs.forEach((controlNode, controlIndex) => {
@@ -4945,7 +4791,7 @@ function renderNode(node, time) {
         const paramName = paramNames[controlIndex];
         if (paramName) {
           const value = controlNode.currentValue; // 0-1 range from input node
-          
+
           // Handle different parameter types
           if (paramName === 'colorPalette') {
             // Map 0-1 value to available color palettes
@@ -4960,7 +4806,7 @@ function renderNode(node, time) {
           } else if (typeof node.params[paramName] === 'number') {
             // Handle numeric parameters
             let scaledValue = value;
-            
+
             // Scale based on parameter type
             if (paramName === 'rotation') {
               scaledValue = value * 360; // 0-360 degrees
@@ -4973,7 +4819,7 @@ function renderNode(node, time) {
             } else if (paramName === 'slices') {
               scaledValue = Math.floor(value * 12) + 1; // 1-12 range
             }
-            
+
             // Apply the scaled value to the parameter
             node.params[paramName] = scaledValue;
           }
@@ -4983,26 +4829,26 @@ function renderNode(node, time) {
   }
 
   gl.useProgram(node.program);
-  
+
   // Set common uniforms
   const resLoc = gl.getUniformLocation(node.program, "u_resolution");
   if (resLoc) gl.uniform2f(resLoc, canvas.width, canvas.height);
-  
+
   const timeLoc = gl.getUniformLocation(node.program, "u_time");
   if (timeLoc) gl.uniform1f(timeLoc, time);
 
   // Set node-specific uniforms
   setNodeUniforms(node);
-  
+
   // Bind input textures AFTER setting uniforms
   bindNodeInputTextures(node);
-  
+
   // Ensure oscillator color palette is always set
   if (node.type === 'Oscillator' && node.params.colorPalette) {
     const palette = colorPalettes[node.params.colorPalette];
     if (palette) {
       const paletteRGB = palette.map(hexToRgb).filter(Boolean);
-      
+
       // Set individual color uniforms
       for (let i = 0; i < 8; i++) {
         const colorLoc = gl.getUniformLocation(node.program, `u_color${i}`);
@@ -5016,7 +4862,7 @@ function renderNode(node, time) {
           }
         }
       }
-      
+
       // Set palette size
       const sizeLoc = gl.getUniformLocation(node.program, 'u_palettesize');
       if (sizeLoc) {
@@ -5027,81 +4873,81 @@ function renderNode(node, time) {
 
   // Render to node's framebuffer
   if (!node.fbo || !gl.isFramebuffer(node.fbo)) {
-    console.warn(`Node ${node.name} has invalid framebuffer - skipping render`);
+    Logger.warn(`Node ${node.name} has invalid framebuffer - skipping render`);
     return;
   }
-  
+
   // CRITICAL: Check for framebuffer-texture feedback loop before rendering
   const hasTextureAttachedToCurrentFBO = node.inputs.some(inputNode => {
     if (!inputNode || inputNode.deleted || !inputNode.texture) return false;
-    
+
     // Check if any input texture is attached to the framebuffer we're about to render to
     if (inputNode.fbo === node.fbo) {
       return true;
     }
     return false;
   });
-  
+
   if (hasTextureAttachedToCurrentFBO) {
-    console.warn(`🚨 FEEDBACK LOOP: Skipping render for ${node.name} (${node.type}) to prevent WebGL feedback loop`);
+    Logger.warn(`FEEDBACK LOOP: Skipping render for ${node.name} (${node.type}) to prevent WebGL feedback loop`);
     return;
   }
-  
+
   try {
     bindQuad();
-    
+
     // Clear any errors before framebuffer operations
     let error = gl.getError();
     while (error !== gl.NO_ERROR) {
       Logger.trace(`Clearing previous error before ${node.name} framebuffer ops:`, error);
       error = gl.getError();
     }
-    
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, node.fbo);
-    
+
     // Check for framebuffer binding errors
     error = gl.getError();
     if (error !== gl.NO_ERROR) {
-      console.error(`🚨 Error binding framebuffer for ${node.name}:`, error);
+      Logger.error(`Error binding framebuffer for ${node.name}:`, error);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       return;
     }
-    
+
     // Check framebuffer status before rendering
     const fbStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
     if (fbStatus !== gl.FRAMEBUFFER_COMPLETE) {
-      console.error(`🚨 Framebuffer incomplete for ${node.name}:`, fbStatus);
+      Logger.error(`Framebuffer incomplete for ${node.name}:`, fbStatus);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       return;
     }
   } catch (e) {
-    console.error(`Exception during framebuffer setup for ${node.name}:`, e);
+    Logger.error(`Exception during framebuffer setup for ${node.name}:`, e);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     return;
   }
-  
+
   gl.viewport(0, 0, canvas.width, canvas.height);
-  
+
   // IMPORTANT: Clear the framebuffer before rendering
   // This prevents accumulation of data and ensures clean output
   gl.clearColor(0, 0, 0, 0);  // Clear to transparent black
   gl.clear(gl.COLOR_BUFFER_BIT);
-  
+
   // Clear any previous WebGL errors before drawing
   let error = gl.getError();
   while (error !== gl.NO_ERROR) {
     Logger.trace(`Clearing previous WebGL error before ${node.name} render:`, error);
     error = gl.getError();
   }
-  
+
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, quadBuffer.numItems);
-  
+
   // Check for errors after drawing
   error = gl.getError();
   if (error !== gl.NO_ERROR) {
-    console.error(`🚨 WebGL error after rendering ${node.name}:`, error);
+    Logger.error(`WebGL error after rendering ${node.name}:`, error);
   }
-  
+
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
 
@@ -5110,19 +4956,19 @@ function renderNode(node, time) {
  */
 function updateIOPreviews(node) {
   if (!node || !selectedNode || selectedNode.id !== node.id) return;
-  
+
   const ioCanvases = document.querySelectorAll('.io-preview-canvas');
-  
+
   ioCanvases.forEach(canvas => {
     const type = canvas.dataset.type;
     const index = parseInt(canvas.dataset.index);
     const ctx = canvas.getContext('2d');
-    
+
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
+
     try {
       if (type === 'input') {
         // Render input texture preview
@@ -5142,7 +4988,7 @@ function updateIOPreviews(node) {
         // Render output texture preview
         if (node.texture) {
           renderTextureToCanvas(node.texture, canvas, ctx);
-          
+
           // Update output info
           const outputInfo = document.getElementById(`output-info-${node.id}`);
           if (outputInfo) {
@@ -5166,7 +5012,7 @@ function updateIOPreviews(node) {
       ctx.font = '8px Arial';
       ctx.textAlign = 'center';
       ctx.fillText('Error', canvas.width/2, canvas.height/2 + 2);
-      console.warn('I/O preview error:', error);
+      Logger.warn('I/O preview error:', error);
     }
   });
 }
@@ -5176,17 +5022,17 @@ function updateIOPreviews(node) {
  */
 function renderTextureToCanvas(texture, canvas, ctx) {
   if (!texture || !gl) return;
-  
+
   try {
     // Simple approach: just show a color pattern based on node type for now
     // This avoids complex framebuffer operations that could cause errors
     const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
     gradient.addColorStop(0, '#4a90e2');
     gradient.addColorStop(1, '#357abd');
-    
+
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
+
     // Add a simple pattern to indicate this is a texture preview
     ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
     for (let i = 0; i < canvas.width; i += 8) {
@@ -5196,13 +5042,13 @@ function renderTextureToCanvas(texture, canvas, ctx) {
         }
       }
     }
-    
+
     // Add "TEX" label
     ctx.fillStyle = '#fff';
     ctx.font = '10px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('TEX', canvas.width/2, canvas.height/2 + 3);
-    
+
   } catch (error) {
     // Show error pattern
     ctx.fillStyle = '#440';
@@ -5216,13 +5062,13 @@ function renderTextureToCanvas(texture, canvas, ctx) {
 
 function setNodeUniforms(node) {
   const program = node.program;
-  
+
   // Set parameters as uniforms
   Object.entries(node.params).forEach(([key, value]) => {
     // Special case for blendMode to maintain camelCase
     const uniformName = key === 'blendMode' ? 'u_blendMode' : `u_${key.toLowerCase()}`;
     const loc = gl.getUniformLocation(program, uniformName);
-    
+
     if (loc) {
       if (typeof value === 'number') {
         // Convert rotation from degrees to radians
@@ -5242,25 +5088,20 @@ function setNodeUniforms(node) {
       } else if (key === 'blendMode') {
         const modes = { 'Normal': 0, 'Multiply': 1, 'Screen': 2, 'Overlay': 3 };
         let modeValue = modes[value] || 0;
-        
+
         // Store the numeric value for debugging
         node.params.blendModeValue = modeValue;
-        
-        // Check for debug mode
-        if (window.debugLayerSplit && node.type === 'Layer') {
-          modeValue = -1; // This triggers split view in shader
-          Logger.info(`Layer ${node.name} in DEBUG SPLIT VIEW mode`);
-        }
-        
+
+
         if (loc !== null && loc !== -1) {
           gl.uniform1f(loc, parseFloat(modeValue));
           // Verify the uniform was set
           const error = gl.getError();
           if (error !== gl.NO_ERROR) {
-            console.error(`WebGL error setting blendMode uniform:`, error);
+            Logger.error(`WebGL error setting blendMode uniform:`, error);
           }
         } else {
-          console.error(`❌ Could not find uniform location for u_blendMode in ${node.name}`);
+          Logger.error(`Could not find uniform location for u_blendMode in ${node.name}`);
         }
       } else if (key === 'colorPalette' && node.type === 'Oscillator') {
         // Handle color palette for oscillator
@@ -5268,7 +5109,7 @@ function setNodeUniforms(node) {
         if (palette) {
           // Convert hex colors to RGB
           const paletteRGB = palette.map(hexToRgb).filter(Boolean);
-          
+
           // Set individual color uniforms (up to 8 colors)
           for (let i = 0; i < 8; i++) {
             const colorLoc = gl.getUniformLocation(program, `u_color${i}`);
@@ -5283,14 +5124,14 @@ function setNodeUniforms(node) {
               }
             }
           }
-          
+
           // Set palette size
           const sizeLoc = gl.getUniformLocation(program, 'u_palettesize');
           if (sizeLoc) {
             gl.uniform1f(sizeLoc, Math.min(paletteRGB.length, 8));
           }
         } else {
-          console.error('Color palette not found:', value);
+          Logger.error('Color palette not found:', value);
         }
       }
     }
@@ -5302,20 +5143,20 @@ function setNodeUniforms(node) {
     if (posLoc) {
       gl.uniform2f(posLoc, node.params.positionX || 0.0, node.params.positionY || 0.0);
     }
-    
+
     const scaleLoc = gl.getUniformLocation(program, 'u_scale');
     if (scaleLoc) {
       gl.uniform2f(scaleLoc, node.params.scaleX || 1.0, node.params.scaleY || 1.0);
     }
   }
-  
+
   // Special handling for input nodes
   if (node.category === 'input') {
     const valueLoc = gl.getUniformLocation(program, 'u_value');
     if (valueLoc) {
       gl.uniform1f(valueLoc, node.currentValue || 0.0);
     }
-    
+
     const colorLoc = gl.getUniformLocation(program, 'u_color');
     if (colorLoc) {
       // Different colors for different input types
@@ -5338,46 +5179,46 @@ function setNodeUniforms(node) {
 function bindNodeInputTextures(node) {
   // CRITICAL FIX: For multi-texture nodes, bind ALL textures FIRST, then set uniforms
   // This ensures all texture units remain bound when the shader executes
-  
+
   if (node.type === 'Layer') {
     Logger.info(`Binding textures for Layer ${node.name}:`);
   }
-  
+
   // First pass: Bind all textures to their respective texture units
   const textureBindings = [];
   node.inputs.forEach((inputNode, index) => {
     if (inputNode && inputNode.texture && !inputNode.deleted) {
       // PREVENT FEEDBACK LOOP: Enhanced detection for Mix/Layer nodes
       if (inputNode === node) {
-        console.warn(`Preventing direct feedback loop: ${node.name} cannot use itself as input`);
+        Logger.warn(`Preventing direct feedback loop: ${node.name} cannot use itself as input`);
         return;
       }
-      
+
       // PREVENT INDIRECT FEEDBACK LOOP: Check if inputNode depends on current node
       if (nodeHasDependency(inputNode, node)) {
-        console.warn(`Preventing indirect feedback loop: ${node.name} -> ${inputNode.name} -> ... -> ${node.name}`);
+        Logger.warn(`Preventing indirect feedback loop: ${node.name} -> ${inputNode.name} -> ... -> ${node.name}`);
         return;
       }
-      
+
       // Validate texture before binding
       if (!gl.isTexture(inputNode.texture)) {
-        console.warn(`Input node ${inputNode.name} has invalid texture - using fallback`);
+        Logger.warn(`Input node ${inputNode.name} has invalid texture - using fallback`);
         inputNode.texture = createFallbackTexture();
         if (!inputNode.texture) {
-          console.error(`Failed to create fallback texture for ${inputNode.name}`);
+          Logger.error(`Failed to create fallback texture for ${inputNode.name}`);
           return;
         }
       }
-      
+
       // Activate and bind texture to its unit
       const textureUnit = index;
       gl.activeTexture(gl.TEXTURE0 + textureUnit);
       gl.bindTexture(gl.TEXTURE_2D, inputNode.texture);
-      
+
       if (node.type === 'Layer') {
         Logger.info(`  Texture unit ${textureUnit}: ${inputNode.name}`);
       }
-      
+
       // Store binding info for uniform setting
       textureBindings.push({
         index: index,
@@ -5386,16 +5227,16 @@ function bindNodeInputTextures(node) {
       });
     }
   });
-  
+
   // Second pass: Set all uniforms AFTER all textures are bound
   textureBindings.forEach(binding => {
     const isMultiInputNode = node.type === 'Mix' || node.type === 'Layer' || node.type === 'Composite';
     const uniformName = isMultiInputNode ? `u_texture${binding.index + 1}` : (binding.index === 0 ? "u_texture" : `u_texture${binding.index + 1}`);
-    
+
     const loc = gl.getUniformLocation(node.program, uniformName);
     if (loc !== null && loc !== -1) {
       gl.uniform1i(loc, binding.textureUnit);
-      
+
       if (node.type === 'Layer') {
         // Verify the uniform was set correctly
         const uniformValue = gl.getUniform(node.program, loc);
@@ -5404,7 +5245,7 @@ function bindNodeInputTextures(node) {
     } else {
       // Only warn if this is actually an expected uniform (not just an unconnected optional input)
       if (binding.index < 2 || node.type === 'Composite') { // First 2 inputs or Composite node
-        console.warn(`Could not find uniform ${uniformName} for ${node.name}`);
+        Logger.warn(`Could not find uniform ${uniformName} for ${node.name}`);
       }
     }
   });
@@ -5419,7 +5260,7 @@ function nodeHasDependency(node, targetNode, visited = new Set()) {
     return false;
   }
   visited.add(node);
-  
+
   // Check if any of this node's inputs depend on the target
   for (const inputNode of node.inputs) {
     if (inputNode) {
@@ -5431,7 +5272,7 @@ function nodeHasDependency(node, targetNode, visited = new Set()) {
       }
     }
   }
-  
+
   return false;
 }
 
@@ -5454,16 +5295,16 @@ function setMainOutput(node) {
 function updateMainOutputDropdown() {
   const select = document.getElementById('main-output-select');
   if (!select) return; // Guard against missing DOM element
-  
+
   // Find the Canvas node (formerly Final Output)
   const canvasDisplayNode = nodes.find(n => n.type === 'FinalOutput');
   if (!canvasDisplayNode) return; // Guard against missing node
-  
+
   // Always use Canvas as the main output (it shows whatever is connected to it)
   mainOutputNode = canvasDisplayNode;
-  
+
   select.innerHTML = '<option value="">None</option>';
-  
+
   // Show what's currently connected to Canvas
   const connectedNode = canvasDisplayNode.inputs && canvasDisplayNode.inputs[0];
   if (connectedNode && connectedNode.name) {
@@ -5473,7 +5314,7 @@ function updateMainOutputDropdown() {
     connectedOption.selected = true;
     select.appendChild(connectedOption);
   }
-  
+
   // Add all other non-system nodes as options
   nodes.forEach(node => {
     if (node && node.category !== 'system' && node !== connectedNode && node.name) {
@@ -5487,7 +5328,7 @@ function updateMainOutputDropdown() {
   select.onchange = (e) => {
     const canvasDisplayNode = nodes.find(n => n.type === 'FinalOutput');
     if (!canvasDisplayNode) return;
-    
+
     if (e.target.value === '') {
       // Disconnect from Canvas
       canvasDisplayNode.inputs[0] = null;
@@ -5499,11 +5340,11 @@ function updateMainOutputDropdown() {
         canvasDisplayNode.inputs[0] = nodeToConnect;
       }
     }
-    
+
     updateConnections();
       saveState('Change Canvas Input');
   };
-  
+
 }
 
 
@@ -5514,12 +5355,12 @@ function updateMainOutputVisualIndicator() {
       node.element.classList.remove('main-output');
     }
   });
-  
+
   // Add main-output class to the current main output node
   if (mainOutputNode && mainOutputNode.element) {
     mainOutputNode.element.classList.add('main-output');
   }
-  
+
   // Update connections to highlight main output path
   updateConnections();
 }
@@ -5527,16 +5368,16 @@ function updateMainOutputVisualIndicator() {
 function handleResolutionChange(resolution) {
   const sizes = {
     'Low': [640, 360],
-    'Medium': [854, 480], 
+    'Medium': [854, 480],
     'High': [1280, 720],
     'Ultra': [1920, 1080]
   };
-  
+
   const [w, h] = sizes[resolution] || sizes['Medium'];
   canvas.width = w;
   canvas.height = h;
   gl.viewport(0, 0, w, h);
-  
+
   // Reallocate node FBOs
   nodes.forEach(node => {
     if (node.fbo) {
@@ -5550,22 +5391,22 @@ function handleResolutionChange(resolution) {
 function fitGraphToView() {
   // Auto-arrange nodes in a grid (EXCLUDE Canvas node to preserve its lower-right positioning)
   const nodesToFit = nodes.filter(n => n.name !== 'Canvas');
-  
+
   nodesToFit.forEach((node, index) => {
     const cols = Math.ceil(Math.sqrt(nodesToFit.length));
     const col = index % cols;
     const row = Math.floor(index / cols);
-    
+
     node.x = 50 + col * 250;
     node.y = 50 + row * 150;
-    
+
     if (node.element) {
       node.element.style.left = node.x + 'px';
       node.element.style.top = node.y + 'px';
     }
   });
-  
-  console.log(`📐 fitGraphToView: Arranged ${nodesToFit.length} nodes in grid (Canvas excluded)`);
+
+  Logger.debug(`fitGraphToView: Arranged ${nodesToFit.length} nodes in grid (Canvas excluded)`);
   updateConnections();
 }
 
@@ -5579,7 +5420,7 @@ function createGroup(name) {
 function updateGroupsList() {
   const container = document.getElementById('groups-list');
   container.innerHTML = '';
-  
+
   Object.values(groups).forEach(group => {
     const groupEl = document.createElement('div');
     groupEl.className = 'group-item';
@@ -5590,19 +5431,19 @@ function updateGroupsList() {
       </button>
       <div class="group-toggle ${group.enabled ? 'enabled' : ''}"></div>
     `;
-    
+
     const toggle = groupEl.querySelector('.group-toggle');
     toggle.addEventListener('click', () => {
       group.enabled = !group.enabled;
       toggle.classList.toggle('enabled', group.enabled);
     });
-    
+
     const copyBtn = groupEl.querySelector('.group-copy-btn');
     copyBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       copyGroup(group.name);
     });
-    
+
     container.appendChild(groupEl);
   });
 }
@@ -5622,24 +5463,24 @@ function initMIDI() {
         }
         if (midiIn) {
           midiIn.onmidimessage = handleMIDIMessage;
-          console.log("Connected to MIDI device:", midiIn.name);
+          Logger.info("Connected to MIDI device:", midiIn.name);
         }
       })
-      .catch(err => console.warn("MIDI access failed:", err));
+      .catch(err => Logger.warn("MIDI access failed:", err));
   }
 }
 
 function handleMIDIMessage(msg) {
   const data = msg.data;
   const status = data[0] & 0xF0;
-  
+
   if (status === 0xB0) {
     const ccNum = data[1];
     const ccVal = data[2];
     lastMidiCC = ccNum;
-    
+
     document.getElementById('midi-cc').textContent = ccNum;
-    
+
     // Handle control input mappings
     if (controlInputs.midi[ccNum]) {
       const mapping = controlInputs.midi[ccNum];
@@ -5647,7 +5488,7 @@ function handleMIDIMessage(msg) {
       const mappedValue = mapping.min + normalizedValue * (mapping.max - mapping.min);
       applyControlInput(mapping.nodeId, mapping.param, mappedValue);
     }
-    
+
     if (midiMappings[ccNum]) {
       midiMappings[ccNum](ccVal);
     }
@@ -5667,37 +5508,37 @@ function initAudio() {
  */
 function analyzeAudio() {
   if (!audioEnabled || !analyser) return;
-  
+
   analyser.getByteFrequencyData(frequencyData);
-  
+
   const sampleRate = audioContext.sampleRate;
   const nyquist = sampleRate / 2;
   const binWidth = nyquist / frequencyData.length;
-  
+
   // Get time domain data for RMS and peak calculation
   const timeData = new Float32Array(analyser.fftSize);
   analyser.getFloatTimeDomainData(timeData);
-  
+
   // Reset band values
   Object.keys(audioBands).forEach(band => {
     audioBands[band].value = 0;
     audioBands[band].rms = 0;
     audioBands[band].peak = 0;
   });
-  
+
   let overallSum = 0;
   let overallRmsSum = 0;
   let overallPeak = 0;
   let totalBins = 0;
-  
+
   // Analyze each frequency bin
   for (let i = 0; i < frequencyData.length; i++) {
     const frequency = i * binWidth;
     const amplitude = frequencyData[i] / 255; // Normalize to 0-1
-    
+
     overallSum += amplitude;
     totalBins++;
-    
+
     // Distribute into frequency bands
     Object.keys(audioBands).forEach(bandName => {
       const band = audioBands[bandName];
@@ -5706,43 +5547,43 @@ function analyzeAudio() {
       }
     });
   }
-  
+
   // Calculate RMS and peak from time domain data
   for (let i = 0; i < timeData.length; i++) {
     const sample = timeData[i];
     overallRmsSum += sample * sample;
     overallPeak = Math.max(overallPeak, Math.abs(sample));
   }
-  
+
   // Calculate overall metrics
   audioBands.overall.value = overallSum / totalBins;
   audioBands.overall.rms = Math.sqrt(overallRmsSum / timeData.length);
   audioBands.overall.peak = overallPeak;
-  
+
   // Calculate approximate LUFS (simplified EBU R128)
   audioBands.overall.lufs = calculateLUFS(audioBands.overall.rms);
-  
+
   // Store analysis data for LUFS averaging
   audioAnalysisBuffer.push({
     rms: audioBands.overall.rms,
     timestamp: Date.now()
   });
-  
+
   // Keep only last 3 seconds of data for LUFS
   const now = Date.now();
   audioAnalysisBuffer = audioAnalysisBuffer.filter(data => now - data.timestamp < 3000);
-  
+
   // Update peak hold
   peakHoldTime = Math.max(peakHoldTime - 16, overallPeak * 1000); // 16ms decay
-  
+
   // Apply audio control mappings with different metrics
   Object.keys(controlInputs.audio).forEach(bandName => {
     const mappings = controlInputs.audio[bandName];
     if (!mappings) return;
-    
+
     mappings.forEach(mapping => {
       let bandValue = 0;
-      
+
       // Select metric based on mapping type
       if (bandName.includes('rms')) {
         bandValue = audioBands[bandName.replace('_rms', '')]?.rms || audioBands.overall.rms;
@@ -5753,7 +5594,7 @@ function analyzeAudio() {
       } else {
         bandValue = audioBands[bandName]?.value || 0;
       }
-      
+
       const mappedValue = mapping.min + bandValue * (mapping.max - mapping.min);
       applyControlInput(mapping.nodeId, mapping.param, mappedValue);
     });
@@ -5780,7 +5621,7 @@ function startColorAnalysis() {
 function updateDebugPanel(type, data) {
   const debugContent = document.getElementById('debug-content');
   if (!debugContent) return;
-  
+
   if (type === 'layer') {
     debugContent.innerHTML = `
       <div style="color: #6366f1; font-weight: bold;">Layer: ${data.name}</div>
@@ -5801,19 +5642,19 @@ function updateAudioMeters() {
   const bassBar = document.getElementById('bass-meter');
   const overallBar = document.getElementById('overall-meter');
   const lufsDisplay = document.getElementById('lufs-display');
-  
+
   if (bassBar) {
     const bassLevel = Math.min(100, audioBands.bass.value * 100);
     bassBar.style.width = `${bassLevel}%`;
     bassBar.style.backgroundColor = bassLevel > 80 ? '#ef4444' : bassLevel > 60 ? '#f59e0b' : '#10b981';
   }
-  
+
   if (overallBar) {
     const overallLevel = Math.min(100, audioBands.overall.rms * 200);
     overallBar.style.width = `${overallLevel}%`;
     overallBar.style.backgroundColor = overallLevel > 80 ? '#ef4444' : overallLevel > 60 ? '#f59e0b' : '#10b981';
   }
-  
+
   if (lufsDisplay) {
     const lufs = audioBands.overall.lufs;
     lufsDisplay.textContent = lufs <= -70 ? '-∞' : `${lufs.toFixed(1)}`;
@@ -5826,7 +5667,7 @@ function updateAudioMeters() {
  */
 function calculateLUFS(rmsValue) {
   if (rmsValue === 0) return -70; // Silence threshold
-  
+
   // Simplified LUFS calculation (not full EBU R128 but close approximation)
   const lufs = 20 * Math.log10(rmsValue) - 0.691;
   return Math.max(-70, Math.min(0, lufs)); // Clamp to reasonable range
@@ -5861,7 +5702,7 @@ function applyControlInput(nodeId, paramName, value) {
       node.params[paramName] = value;
     }
     updateNodeProperties(node); // Refresh UI if node is selected
-    
+
     // Save state for MIDI parameter changes
     clearTimeout(parameterChangeTimeout);
     parameterChangeTimeout = setTimeout(() => {
@@ -5893,7 +5734,7 @@ function rgbToHsb(r, g, b) {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   const diff = max - min;
-  
+
   let h = 0;
   if (diff !== 0) {
     if (max === r) h = ((g - b) / diff) % 6;
@@ -5902,10 +5743,10 @@ function rgbToHsb(r, g, b) {
   }
   h = Math.round(h * 60);
   if (h < 0) h += 360;
-  
+
   const s = max === 0 ? 0 : diff / max;
   const brightness = max;
-  
+
   return { h, s, b: brightness };
 }
 
@@ -5924,23 +5765,23 @@ function getCurrentOscillatorColor(node) {
   if (node.type !== 'Oscillator' || !node.params.colorPalette) {
     return { r: 1, g: 1, b: 1 }; // White fallback
   }
-  
+
   const palette = colorPalettes[node.params.colorPalette];
   if (!palette) return { r: 1, g: 1, b: 1 };
-  
+
   // Calculate current color index based on time and colorSpeed
   const elapsed = (Date.now() - startTime) / 1000.0;
   const animatedIndex = (node.params.colorIndex + elapsed * node.params.colorSpeed) % palette.length;
   const colorIndex = Math.floor(animatedIndex);
   const nextColorIndex = (colorIndex + 1) % palette.length;
   const t = animatedIndex - colorIndex;
-  
+
   // Interpolate between current and next color
   const currentColor = hexToRgb(palette[colorIndex]);
   const nextColor = hexToRgb(palette[nextColorIndex]);
-  
+
   if (!currentColor || !nextColor) return { r: 1, g: 1, b: 1 };
-  
+
   return {
     r: currentColor.r + (nextColor.r - currentColor.r) * t,
     g: currentColor.g + (nextColor.g - currentColor.g) * t,
@@ -5956,48 +5797,48 @@ function updateColorComponents() {
   Object.keys(colorComponents).forEach(key => {
     colorComponents[key].value = 0;
   });
-  
+
   // Find active oscillator nodes and blend their colors
-  const activeOscillators = nodes.filter(node => 
-    node.type === 'Oscillator' && node.enabled && 
+  const activeOscillators = nodes.filter(node =>
+    node.type === 'Oscillator' && node.enabled &&
     (!node.groupName || groups[node.groupName]?.enabled !== false)
   );
-  
+
   if (activeOscillators.length === 0) return;
-  
+
   // Average the color components from all active oscillators
   let totalR = 0, totalG = 0, totalB = 0;
-  
+
   activeOscillators.forEach(node => {
     const color = getCurrentOscillatorColor(node);
     totalR += color.r;
     totalG += color.g;
     totalB += color.b;
   });
-  
+
   const avgR = totalR / activeOscillators.length;
   const avgG = totalG / activeOscillators.length;
   const avgB = totalB / activeOscillators.length;
-  
+
   // Update RGB components
   colorComponents.red.value = avgR;
   colorComponents.green.value = avgG;
   colorComponents.blue.value = avgB;
-  
+
   // Convert to HSB
   const hsb = rgbToHsb(avgR, avgG, avgB);
   colorComponents.hue.value = hsb.h;
   colorComponents.saturation.value = hsb.s;
   colorComponents.brightness.value = hsb.b;
-  
+
   // Calculate luminance
   colorComponents.luminance.value = calculateLuminance(avgR, avgG, avgB);
-  
+
   // Apply color control mappings
   Object.keys(controlInputs.color).forEach(componentName => {
     const mappings = controlInputs.color[componentName];
     const componentValue = colorComponents[componentName]?.value || 0;
-    
+
     mappings.forEach(mapping => {
       const mappedValue = mapping.min + componentValue * (mapping.max - mapping.min);
       applyControlInput(mapping.nodeId, mapping.param, mappedValue);
@@ -6026,12 +5867,12 @@ function initCursor() {
       <div>Click: <span id="cursor-click">0</span></div>
     </div>
   `;
-  
+
   // Insert after MIDI section
   const midiSection = rightSidebar.querySelector('.sidebar-section:last-child');
   midiSection.parentNode.insertBefore(cursorSection, midiSection.nextSibling);
-  
-  console.log('🖱️ Cursor input system initialized');
+
+  Logger.info('Cursor input system initialized');
 }
 
 /**
@@ -6041,19 +5882,19 @@ function startCursorTracking() {
   let lastMousePos = { x: 0, y: 0 };
   let lastTime = Date.now();
   let isMouseDown = false;
-  
+
   const canvas = document.getElementById('glcanvas');
-  
+
   // Track mouse movement
   document.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
     const y = (e.clientY - rect.top) / rect.height;
-    
+
     // Clamp to 0-1 range
     cursorComponents.x.value = Math.max(0, Math.min(1, x));
     cursorComponents.y.value = Math.max(0, Math.min(1, y));
-    
+
     // Calculate velocity
     const now = Date.now();
     const deltaTime = (now - lastTime) / 1000; // seconds
@@ -6061,16 +5902,16 @@ function startCursorTracking() {
     const deltaY = y - lastMousePos.y;
     const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
     const velocity = distance / deltaTime;
-    
+
     cursorComponents.velocity.value = Math.min(1, velocity); // Clamp to 0-1
-    
+
     lastMousePos = { x, y };
     lastTime = now;
-    
+
     updateCursorDisplay();
     applyCursorMappings();
   });
-  
+
   // Track mouse clicks
   document.addEventListener('mousedown', () => {
     isMouseDown = true;
@@ -6078,15 +5919,15 @@ function startCursorTracking() {
     updateCursorDisplay();
     applyCursorMappings();
   });
-  
+
   document.addEventListener('mouseup', () => {
     isMouseDown = false;
     cursorComponents.click.value = 0;
     updateCursorDisplay();
     applyCursorMappings();
   });
-  
-  console.log('🖱️ Cursor tracking started');
+
+  Logger.debug('Cursor tracking started');
 }
 
 /**
@@ -6106,9 +5947,9 @@ function applyCursorMappings() {
   Object.keys(controlInputs.cursor).forEach(componentName => {
     const mappings = controlInputs.cursor[componentName];
     if (!mappings) return;
-    
+
     const componentValue = cursorComponents[componentName]?.value || 0;
-    
+
     mappings.forEach(mapping => {
       const mappedValue = mapping.min + componentValue * (mapping.max - mapping.min);
       applyControlInput(mapping.nodeId, mapping.param, mappedValue);
@@ -6135,15 +5976,15 @@ function initControlInputManager() {
   const existingSelect = document.getElementById('existing-control-inputs');
   const newTypeSelect = document.getElementById('new-control-input-type');
   const statusSpan = document.getElementById('control-input-status');
-  
+
   if (!existingSelect || !newTypeSelect || !statusSpan) {
-    console.warn('Control Input Manager elements not found');
+    Logger.warn('Control Input Manager elements not found');
     return;
   }
-  
+
   // Update existing control inputs when the dropdown is opened
   existingSelect.addEventListener('focus', updateExistingControlInputs);
-  
+
   // Handle existing control input selection
   existingSelect.addEventListener('change', (e) => {
     if (e.target.value) {
@@ -6160,7 +6001,7 @@ function initControlInputManager() {
       }
     }
   });
-  
+
   // Handle new control input type selection
   newTypeSelect.addEventListener('change', (e) => {
     if (e.target.value) {
@@ -6168,7 +6009,7 @@ function initControlInputManager() {
       e.target.value = ''; // Reset selection
     }
   });
-  
+
   // Initial update
   updateExistingControlInputs();
 }
@@ -6179,17 +6020,17 @@ function initControlInputManager() {
 function updateExistingControlInputs() {
   const select = document.getElementById('existing-control-inputs');
   if (!select) return;
-  
+
   // Find all control input nodes in the graph
   const controlInputNodes = nodes.filter(node => node.category === 'input');
-  
+
   select.innerHTML = '<option value="">Select to focus node...</option>';
-  
+
   if (controlInputNodes.length === 0) {
     select.innerHTML = '<option value="">No control inputs in graph</option>';
     return;
   }
-  
+
   // Group by type for better organization
   const nodesByType = {};
   controlInputNodes.forEach(node => {
@@ -6198,19 +6039,19 @@ function updateExistingControlInputs() {
     }
     nodesByType[node.type].push(node);
   });
-  
+
   // Add options grouped by type
   Object.keys(nodesByType).sort().forEach(type => {
     const group = document.createElement('optgroup');
     group.label = getControlInputTypeLabel(type);
-    
+
     nodesByType[type].forEach(node => {
       const option = document.createElement('option');
       option.value = node.id;
       option.textContent = node.name;
       group.appendChild(option);
     });
-    
+
     select.appendChild(group);
   });
 }
@@ -6225,29 +6066,29 @@ function createControlInputNode(type) {
     if (!validTypes.includes(type)) {
       throw new Error(`Invalid control input type: ${type}`);
     }
-    
+
     // Find a good position for the new node (left side, stacked)
     const existingInputNodes = nodes.filter(n => n.category === 'input');
     const x = 50;
     const y = 80 + (existingInputNodes.length * 120);
-    
+
     // Create the node
     const node = createNode(type, x, y);
-    
+
     // Select the new node and show properties
     selectNode(node);
-    
+
     // Update the existing control inputs dropdown
     updateExistingControlInputs();
-    
+
     setControlInputStatus(`Created ${getControlInputTypeLabel(type)}`, 'success');
-    
-    console.log(`✅ Created ${type} node:`, node.name);
-    
+
+    Logger.info(`Created ${type} node:`, node.name);
+
     return node;
-    
+
   } catch (error) {
-    console.error('Error creating control input node:', error);
+    Logger.error('Error creating control input node:', error);
     setControlInputStatus(`Error: ${error.message}`, 'error');
     return null;
   }
@@ -6259,7 +6100,7 @@ function createControlInputNode(type) {
 function getControlInputTypeLabel(type) {
   const labels = {
     'MIDIInput': 'MIDI Controller',
-    'AudioInput': 'Audio Analysis', 
+    'AudioInput': 'Audio Analysis',
     'CursorInput': 'Mouse/Cursor',
     'CameraInput': 'Camera Motion',
     'RandomInput': 'Random Generator'
@@ -6273,7 +6114,7 @@ function getControlInputTypeLabel(type) {
 function setControlInputStatus(message, type = '') {
   const statusSpan = document.getElementById('control-input-status');
   if (!statusSpan) return;
-  
+
   statusSpan.textContent = message;
   statusSpan.className = 'control-input-status';
   if (type) {
@@ -6285,31 +6126,31 @@ function setControlInputStatus(message, type = '') {
  * Enable camera input
  */
 async function enableCameraInput() {
-  
+
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ 
+    const stream = await navigator.mediaDevices.getUserMedia({
       video: { width: 320, height: 240 } // Low resolution for analysis
     });
-    
+
     // Create hidden video element
     cameraVideoElement = document.createElement('video');
     cameraVideoElement.srcObject = stream;
     cameraVideoElement.play();
     cameraVideoElement.style.display = 'none';
     document.body.appendChild(cameraVideoElement);
-    
+
     // Create canvas for frame analysis
     cameraCanvas = document.createElement('canvas');
     cameraCanvas.width = 320;
     cameraCanvas.height = 240;
     cameraContext = cameraCanvas.getContext('2d');
-    
+
     cameraEnabled = true;
-    
-    console.log('📸 Camera input enabled');
-    
+
+    Logger.info('Camera input enabled');
+
   } catch (error) {
-    console.error('Camera access error:', error);
+    Logger.error('Camera access error:', error);
   }
 }
 
@@ -6322,14 +6163,14 @@ function startCameraAnalysis() {
       // Draw current frame to canvas
       cameraContext.drawImage(cameraVideoElement, 0, 0, 320, 240);
       const currentFrame = cameraContext.getImageData(0, 0, 320, 240);
-      
+
       // Analyze the frame
       analyzeCameraData(currentFrame);
-      
+
       // Store frame for motion detection
       lastCameraFrame = currentFrame;
     }
-    
+
     requestAnimationFrame(analyzeCameraFrame);
   }
   analyzeCameraFrame();
@@ -6344,35 +6185,35 @@ function analyzeCameraData(frameData) {
   let totalBrightness = 0;
   let minBrightness = 1, maxBrightness = 0;
   let motionAmount = 0;
-  
+
   const pixelCount = pixels.length / 4;
-  
+
   for (let i = 0; i < pixels.length; i += 4) {
     const r = pixels[i] / 255;
     const g = pixels[i + 1] / 255;
     const b = pixels[i + 2] / 255;
-    
+
     totalR += r;
     totalG += g;
     totalB += b;
-    
+
     // Calculate brightness (luminance)
     const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
     totalBrightness += brightness;
     minBrightness = Math.min(minBrightness, brightness);
     maxBrightness = Math.max(maxBrightness, brightness);
-    
+
     // Calculate motion if we have a previous frame
     if (lastCameraFrame) {
       const lastR = lastCameraFrame.data[i] / 255;
       const lastG = lastCameraFrame.data[i + 1] / 255;
       const lastB = lastCameraFrame.data[i + 2] / 255;
-      
+
       const diff = Math.abs(r - lastR) + Math.abs(g - lastG) + Math.abs(b - lastB);
       motionAmount += diff / 3; // Average the color channel differences
     }
   }
-  
+
   // Update camera components
   cameraComponents.brightness.value = totalBrightness / pixelCount;
   cameraComponents.motion.value = Math.min(1, motionAmount / pixelCount * 10); // Scale motion
@@ -6380,7 +6221,7 @@ function analyzeCameraData(frameData) {
   cameraComponents.greenAvg.value = totalG / pixelCount;
   cameraComponents.blueAvg.value = totalB / pixelCount;
   cameraComponents.contrast.value = maxBrightness - minBrightness;
-  
+
   updateCameraDisplay();
   applyCameraMappings();
 }
@@ -6404,9 +6245,9 @@ function applyCameraMappings() {
   Object.keys(controlInputs.camera).forEach(componentName => {
     const mappings = controlInputs.camera[componentName];
     if (!mappings) return;
-    
+
     const componentValue = cameraComponents[componentName]?.value || 0;
-    
+
     mappings.forEach(mapping => {
       const mappedValue = mapping.min + componentValue * (mapping.max - mapping.min);
       applyControlInput(mapping.nodeId, mapping.param, mappedValue);
@@ -6423,29 +6264,29 @@ function applyCameraMappings() {
  */
 function saveState(actionName = 'Action') {
   if (isRestoringState) return; // Don't save during undo/redo
-  
+
   const state = {
     timestamp: Date.now(),
     action: actionName,
     data: serializeProject()
   };
-  
+
   undoStack.push(state);
-  
+
   // Limit stack size
   if (undoStack.length > MAX_UNDO_STATES) {
     undoStack.shift();
   }
-  
+
   // Clear redo stack when new action is performed
   redoStack.length = 0;
-  
+
   updateUndoRedoButtons();
 }
 
 function undo() {
   if (undoStack.length === 0) return;
-  
+
   // Save current state to redo stack
   const currentState = {
     timestamp: Date.now(),
@@ -6453,25 +6294,25 @@ function undo() {
     data: serializeProject()
   };
   redoStack.push(currentState);
-  
+
   // Restore previous state
   const previousState = undoStack.pop();
   isRestoringState = true;
-  
+
   try {
     clearProject();
     deserializeProject(previousState.data);
-    console.log(`↶ Undid: ${previousState.action}`);
+    Logger.info(`Undid: ${previousState.action}`);
   } finally {
     isRestoringState = false;
   }
-  
+
   updateUndoRedoButtons();
 }
 
 function redo() {
   if (redoStack.length === 0) return;
-  
+
   // Save current state to undo stack
   const currentState = {
     timestamp: Date.now(),
@@ -6479,31 +6320,31 @@ function redo() {
     data: serializeProject()
   };
   undoStack.push(currentState);
-  
+
   // Restore next state
   const nextState = redoStack.pop();
   isRestoringState = true;
-  
+
   try {
     clearProject();
     deserializeProject(nextState.data);
-    console.log(`↷ Redid: ${nextState.action}`);
+    Logger.info(`Redid: ${nextState.action}`);
   } finally {
     isRestoringState = false;
   }
-  
+
   updateUndoRedoButtons();
 }
 
 function updateUndoRedoButtons() {
   const undoBtn = document.getElementById('undo-btn');
   const redoBtn = document.getElementById('redo-btn');
-  
+
   if (undoBtn) {
     undoBtn.disabled = undoStack.length === 0;
     undoBtn.title = undoStack.length > 0 ? `Undo: ${undoStack[undoStack.length - 1].action}` : 'Nothing to undo';
   }
-  
+
   if (redoBtn) {
     redoBtn.disabled = redoStack.length === 0;
     redoBtn.title = redoStack.length > 0 ? `Redo: ${redoStack[redoStack.length - 1].action}` : 'Nothing to redo';
@@ -6515,13 +6356,13 @@ function updateUndoRedoButtons() {
  */
 function copySelectedNodes() {
   if (!selectedNode) {
-    console.log('No node selected to copy');
+    Logger.info('No node selected to copy');
     return;
   }
-  
+
   const selectedNodes = getSelectedNodes();
   if (selectedNodes.length === 0) return;
-  
+
   // Create clipboard data with node information and connections
   clipboard = {
     type: 'nodes',
@@ -6538,7 +6379,7 @@ function copySelectedNodes() {
     // Store internal connections between copied nodes
     connections: []
   };
-  
+
   // Find connections between copied nodes
   selectedNodes.forEach((node, nodeIndex) => {
     node.inputs.forEach((inputNode, inputIndex) => {
@@ -6552,40 +6393,40 @@ function copySelectedNodes() {
       }
     });
   });
-  
-  console.log(`📋 Copied ${selectedNodes.length} node(s) to clipboard`);
+
+  Logger.info(`Copied ${selectedNodes.length} node(s) to clipboard`);
   updateCopyPasteButtons();
 }
 
 function pasteNodes() {
   if (!clipboard || clipboard.type !== 'nodes') {
-    console.log('Nothing to paste');
+    Logger.info('Nothing to paste');
     return;
   }
-  
+
   const pastedNodes = [];
   const nodeIdMap = new Map(); // Map original IDs to new nodes
-  
+
   // Create new nodes from clipboard
   clipboard.nodes.forEach((nodeData, index) => {
     const newNode = createNode(
-      nodeData.type, 
-      nodeData.x + PASTE_OFFSET, 
+      nodeData.type,
+      nodeData.x + PASTE_OFFSET,
       nodeData.y + PASTE_OFFSET
     );
-    
+
     // Copy parameters
     newNode.params = { ...nodeData.params };
     newNode.enabled = nodeData.enabled;
     newNode.groupName = nodeData.groupName;
-    
+
     // Update visual element
     updateNodeElement(newNode);
-    
+
     pastedNodes.push(newNode);
     nodeIdMap.set(index, newNode);
   });
-  
+
   // Restore connections between pasted nodes
   clipboard.connections.forEach(conn => {
     const targetNode = nodeIdMap.get(conn.targetIndex);
@@ -6594,27 +6435,27 @@ function pasteNodes() {
       targetNode.inputs[conn.inputIndex] = sourceNode;
     }
   });
-  
+
   // Update UI
   updateConnections();
   updateMainOutputDropdown();
-  
+
   // Select the first pasted node
   if (pastedNodes.length > 0) {
     selectNode(pastedNodes[0]);
   }
-  
-  console.log(`📋 Pasted ${pastedNodes.length} node(s)`);
+
+  Logger.info(`Pasted ${pastedNodes.length} node(s)`);
   saveState(`Paste ${pastedNodes.length} Node(s)`);
 }
 
 function copyGroup(groupName) {
   const groupNodes = nodes.filter(node => node.groupName === groupName);
   if (groupNodes.length === 0) return;
-  
+
   // Temporarily select all nodes in the group
   const originalSelected = selectedNode;
-  
+
   // Copy all nodes in the group
   clipboard = {
     type: 'group',
@@ -6631,7 +6472,7 @@ function copyGroup(groupName) {
     })),
     connections: []
   };
-  
+
   // Find all connections between nodes in the group
   groupNodes.forEach((node, nodeIndex) => {
     node.inputs.forEach((inputNode, inputIndex) => {
@@ -6645,8 +6486,8 @@ function copyGroup(groupName) {
       }
     });
   });
-  
-  console.log(`📋 Copied group "${groupName}" (${groupNodes.length} nodes) to clipboard`);
+
+  Logger.info(`Copied group "${groupName}" (${groupNodes.length} nodes) to clipboard`);
   updateCopyPasteButtons();
 }
 
@@ -6659,12 +6500,12 @@ function getSelectedNodes() {
 function updateCopyPasteButtons() {
   const copyBtn = document.getElementById('copy-btn');
   const pasteBtn = document.getElementById('paste-btn');
-  
+
   if (copyBtn) {
     copyBtn.disabled = !selectedNode;
     copyBtn.title = selectedNode ? `Copy ${selectedNode.name}` : 'Select a node to copy';
   }
-  
+
   if (pasteBtn) {
     pasteBtn.disabled = !clipboard;
     if (clipboard) {
@@ -6688,7 +6529,7 @@ function serializeProject() {
     createdAt: currentProject.createdAt,
     modifiedAt: Date.now(),
     version: '1.0',
-    
+
     // Serialize nodes (exclude system nodes like FinalOutput)
     nodes: nodes.filter(node => node.category !== 'system').map(node => ({
       id: node.id,
@@ -6704,22 +6545,22 @@ function serializeProject() {
       // Serialize control inputs as node IDs (if they exist)
       controlInputs: node.controlInputs ? node.controlInputs.map(inputNode => inputNode ? inputNode.id : null) : []
     })),
-    
+
     // Serialize FinalOutput connections separately
     finalOutputInput: (() => {
       const finalOutput = nodes.find(n => n.type === 'FinalOutput');
       return finalOutput && finalOutput.inputs[0] ? finalOutput.inputs[0].id : null;
     })(),
-    
+
     // Serialize groups
     groups: Object.entries(groups).map(([name, group]) => ({
       name,
       enabled: group.enabled
     })),
-    
+
     // Serialize main output
     mainOutputNodeId: mainOutputNode ? mainOutputNode.id : null,
-    
+
     // Serialize control inputs
     controlInputs: {
       midi: { ...controlInputs.midi },
@@ -6728,13 +6569,13 @@ function serializeProject() {
       cursor: { ...controlInputs.cursor },
       camera: { ...controlInputs.camera }
     },
-    
+
     // Serialize graph state
     graphVisible: graphVisible,
     nodeCount: nodeCount,
     groupCount: groupCount
   };
-  
+
   return projectData;
 }
 
@@ -6745,7 +6586,7 @@ function deserializeProject(projectData) {
   try {
     // Clear current state
     clearProject();
-    
+
     // Restore project metadata
     currentProject = {
       id: projectData.id,
@@ -6755,11 +6596,11 @@ function deserializeProject(projectData) {
       modifiedAt: projectData.modifiedAt,
       autoSave: true
     };
-    
+
     // Restore counters
     nodeCount = projectData.nodeCount || 0;
     groupCount = projectData.groupCount || 0;
-    
+
     // Restore groups
     if (projectData.groups) {
       projectData.groups.forEach(groupData => {
@@ -6768,7 +6609,7 @@ function deserializeProject(projectData) {
         };
       });
     }
-    
+
     // Restore nodes (first pass - create nodes without connections)
     const nodeMap = new Map(); // id -> node
     if (projectData.nodes) {
@@ -6780,20 +6621,20 @@ function deserializeProject(projectData) {
         node.params = { ...node.params, ...nodeData.params };
         node.enabled = nodeData.enabled;
         node.groupName = nodeData.groupName;
-        
+
         // Initialize node (create textures, programs, etc.)
         if (node.type === 'Video') {
           initVideoNode(node);
         } else {
           allocateNodeFBO(node);
         }
-        
+
         nodes.push(node);
         nodeMap.set(node.id, node);
-        
+
         // Create UI element
         createNodeElement(node);
-        
+
         // Force icon refresh for kaleidoscope nodes (fix legacy saves)
         if (node.type === 'Kaleidoscope' && node.icon !== 'auto_fix_high') {
           node.icon = 'auto_fix_high';
@@ -6801,41 +6642,41 @@ function deserializeProject(projectData) {
         }
       });
     }
-    
+
     // Second pass - restore connections
     if (projectData.nodes) {
       projectData.nodes.forEach(nodeData => {
         const node = nodeMap.get(nodeData.id);
         if (node && nodeData.inputs) {
-          node.inputs = nodeData.inputs.map(inputId => 
+          node.inputs = nodeData.inputs.map(inputId =>
             inputId ? nodeMap.get(inputId) || null : null
           );
         }
         // Restore control inputs if they exist
         if (node && nodeData.controlInputs) {
-          node.controlInputs = nodeData.controlInputs.map(inputId => 
+          node.controlInputs = nodeData.controlInputs.map(inputId =>
             inputId ? nodeMap.get(inputId) || null : null
           );
         }
       });
     }
-    
+
     // Restore FinalOutput connection
     const finalOutputNode = nodes.find(n => n.type === 'FinalOutput');
     if (finalOutputNode && projectData.finalOutputInput) {
       const connectedNode = nodeMap.get(projectData.finalOutputInput);
       if (connectedNode) {
         finalOutputNode.inputs[0] = connectedNode;
-        console.log('✅ Restored Canvas connection to:', connectedNode.name);
+        Logger.info('Restored Canvas connection to:', connectedNode.name);
       }
     }
-    
+
     // Ensure FinalOutput node is always the main output
     if (finalOutputNode) {
       setMainOutput(finalOutputNode);
-      console.log('✅ Set FinalOutput as main output after project restore');
+      Logger.info('Set FinalOutput as main output after project restore');
     }
-    
+
     // Restore control inputs
     if (projectData.controlInputs) {
       Object.assign(controlInputs.midi, projectData.controlInputs.midi || {});
@@ -6844,29 +6685,29 @@ function deserializeProject(projectData) {
       Object.assign(controlInputs.cursor, projectData.controlInputs.cursor || {});
       Object.assign(controlInputs.camera, projectData.controlInputs.camera || {});
     }
-    
+
     // Restore graph state
     graphVisible = projectData.graphVisible !== false;
-    
+
     // Update UI
     updateMainOutputDropdown();
     updateMainOutputVisualIndicator();
     updateConnections();
     updateGroupsList();
     updateProjectTitle();
-    
+
     // Final verification of main output consistency
     const dropdown = document.getElementById('main-output-select');
     const dropdownValue = dropdown?.value;
     const dropdownNodeId = dropdownValue ? parseInt(dropdownValue) : null;
     const actualMainOutputId = mainOutputNode?.id;
-    
+
     // Handle empty dropdown value (happens during undo/redo)
     if (!dropdownValue || isNaN(dropdownNodeId)) {
-      console.warn('⚠️ Main output dropdown has invalid value during undo/redo, fixing...');
+      Logger.warn('Main output dropdown has invalid value during undo/redo, fixing...');
       updateMainOutputDropdown();
     } else if (dropdownNodeId !== actualMainOutputId) {
-      console.error('🚨 Main output sync error detected!', {
+      Logger.error('Main output sync error detected!', {
         dropdown: dropdownNodeId,
         actual: actualMainOutputId,
         mainOutputNode: mainOutputNode?.name
@@ -6874,14 +6715,14 @@ function deserializeProject(projectData) {
       // Force sync by calling setMainOutput again
       setMainOutput(mainOutputNode);
     } else {
-      console.log('✅ Main output sync verified:', mainOutputNode?.name, `(ID: ${actualMainOutputId})`);
+      Logger.info('Main output sync verified:', mainOutputNode?.name, `(ID: ${actualMainOutputId})`);
     }
-    
+
     hasUnsavedChanges = false;
-    console.log(`📄 Loaded project: ${currentProject.name}`);
-    
+    Logger.info(`Loaded project: ${currentProject.name}`);
+
   } catch (error) {
-    console.error('Failed to load project:', error);
+    Logger.error('Failed to load project:', error);
     alert('Failed to load project. The save file may be corrupted.');
   }
 }
@@ -6897,27 +6738,27 @@ function clearProject() {
     if (node.element) node.element.remove();
   });
   nodes.length = 0;
-  
+
   // Clear groups
   Object.keys(groups).forEach(key => delete groups[key]);
-  
+
   // Clear control inputs
   Object.keys(controlInputs.midi).forEach(key => delete controlInputs.midi[key]);
   Object.keys(controlInputs.audio).forEach(key => delete controlInputs.audio[key]);
   Object.keys(controlInputs.color).forEach(key => delete controlInputs.color[key]);
   Object.keys(controlInputs.cursor).forEach(key => delete controlInputs.cursor[key]);
   Object.keys(controlInputs.camera).forEach(key => delete controlInputs.camera[key]);
-  
+
   // Reset state
   selectedNode = null;
   mainOutputNode = null;
   draggedNode = null;
   connectionStart = null;
-  
+
   // Clear UI
   document.getElementById('nodes-container').innerHTML = '';
   document.getElementById('connections-svg').innerHTML = '';
-  
+
   // Recreate the permanent FinalOutput node
   createFinalOutputNode();
 }
@@ -6929,26 +6770,26 @@ function saveProject(name = null) {
   if (name) {
     currentProject.name = name;
   }
-  
+
   if (!currentProject.id) {
     currentProject.id = generateProjectId();
     currentProject.createdAt = Date.now();
   }
-  
+
   currentProject.modifiedAt = Date.now();
-  
+
   const projectData = serializeProject();
   const projects = getStoredProjects();
   projects[currentProject.id] = projectData;
-  
+
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
     hasUnsavedChanges = false;
     updateProjectTitle();
-    console.log(`Saved project: ${currentProject.name}`);
+    Logger.info(`Saved project: ${currentProject.name}`);
     showNotification(`Saved "${currentProject.name}"`);
   } catch (error) {
-    console.error('Failed to save project:', error);
+    Logger.error('Failed to save project:', error);
     alert('Failed to save project. LocalStorage may be full.');
   }
 }
@@ -6959,11 +6800,11 @@ function saveProject(name = null) {
 function loadProject(projectId) {
   const projects = getStoredProjects();
   const projectData = projects[projectId];
-  
+
   if (projectData) {
     deserializeProject(projectData);
     startAutoSave();
-    
+
     // Clear autosave since we loaded a specific project
     localStorage.removeItem(AUTOSAVE_KEY);
   } else {
@@ -6977,16 +6818,16 @@ function loadProject(projectId) {
 function deleteProject(projectId) {
   const projects = getStoredProjects();
   const projectName = projects[projectId]?.name || 'Unknown';
-  
+
   if (confirm(`Delete "${projectName}"? This cannot be undone.`)) {
     delete projects[projectId];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-    
+
     // If deleting current project, create new one
     if (currentProject.id === projectId) {
       newProject();
     }
-    
+
     showNotification(`Deleted "${projectName}"`);
   }
 }
@@ -6998,9 +6839,9 @@ function newProject() {
   if (hasUnsavedChanges && !confirm('Discard unsaved changes?')) {
     return;
   }
-  
+
   clearProject();
-  
+
   currentProject = {
     id: null,
     name: 'Untitled Synthesis',
@@ -7009,15 +6850,15 @@ function newProject() {
     modifiedAt: null,
     autoSave: true
   };
-  
+
   // Create initial node
   const initialOsc = createNode('Oscillator', 300, 200);
   setMainOutput(initialOsc);
-  
+
   hasUnsavedChanges = false;
   updateProjectTitle();
   startAutoSave();
-  
+
   // Clear autosave since we're starting fresh
   localStorage.removeItem(AUTOSAVE_KEY);
 }
@@ -7030,7 +6871,7 @@ function getStoredProjects() {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored ? JSON.parse(stored) : {};
   } catch (error) {
-    console.error('Failed to read projects from storage:', error);
+    Logger.error('Failed to read projects from storage:', error);
     return {};
   }
 }
@@ -7059,7 +6900,7 @@ function startAutoSave() {
   if (autoSaveTimer) {
     clearInterval(autoSaveTimer);
   }
-  
+
   autoSaveTimer = setInterval(() => {
     if (hasUnsavedChanges && currentProject.autoSave) {
       saveProject();
@@ -7083,7 +6924,7 @@ function updateProjectTitle() {
  */
 function showNotification(message) {
   // Simple notification - could be enhanced with a proper toast system
-  console.log(`📁 ${message}`);
+  Logger.info(`${message}`);
 }
 
 /**
@@ -7099,36 +6940,36 @@ async function checkForUpdates() {
   if (location.protocol === 'file:') {
     return;
   }
-  
+
   try {
     const filesToCheck = [
       { url: './script.js', name: 'JavaScript' },
       { url: './style.css', name: 'CSS' },
       { url: './index.html', name: 'HTML' }
     ];
-    
+
     let hasChanges = false;
     const currentModTimes = new Map();
-    
+
     for (const file of filesToCheck) {
       try {
-        const response = await fetch(file.url + '?t=' + Date.now(), { 
+        const response = await fetch(file.url + '?t=' + Date.now(), {
           method: 'HEAD',
           cache: 'no-cache'
         });
-        
+
         if (response.ok) {
           const lastModified = response.headers.get('Last-Modified');
           const etag = response.headers.get('ETag');
           const identifier = lastModified || etag || 'unknown';
-          
+
           currentModTimes.set(file.name, identifier);
-          
+
           // Check if this file has changed
           if (lastFileModTimes.has(file.name)) {
             const lastIdentifier = lastFileModTimes.get(file.name);
             if (lastIdentifier !== identifier) {
-              console.log(`🔄 ${file.name} file updated`);
+              Logger.info(`${file.name} file updated`);
               hasChanges = true;
             }
           }
@@ -7137,14 +6978,14 @@ async function checkForUpdates() {
         // Silently fail for individual files to avoid console spam
         // Only log if it's not a typical CORS/fetch restriction
         if (!error.message.includes('fetch')) {
-          console.warn(`Failed to check ${file.name}:`, error);
+          Logger.warn(`Failed to check ${file.name}:`, error);
         }
       }
     }
-    
+
     // Update stored modification times
     lastFileModTimes = currentModTimes;
-    
+
     if (hasChanges && !updateNotificationShown) {
       updateAvailable = true;
       updateStatusIndicator('available');
@@ -7152,9 +6993,9 @@ async function checkForUpdates() {
     } else if (!hasChanges) {
       updateStatusIndicator('active');
     }
-    
+
   } catch (error) {
-    console.warn('Update check failed:', error);
+    Logger.warn('Update check failed:', error);
   }
 }
 
@@ -7164,7 +7005,7 @@ async function checkForUpdates() {
 function showUpdateNotification() {
   if (updateNotificationShown) return;
   updateNotificationShown = true;
-  
+
   // Create update notification overlay
   const overlay = document.createElement('div');
   overlay.className = 'update-notification';
@@ -7187,13 +7028,13 @@ function showUpdateNotification() {
       </div>
     </div>
   `;
-  
+
   document.body.appendChild(overlay);
-  
+
   // Add event listeners
   const updateNowBtn = document.getElementById('update-now-btn');
   const updateLaterBtn = document.getElementById('update-later-btn');
-  
+
   updateNowBtn.addEventListener('click', performUpdate);
   updateLaterBtn.addEventListener('click', () => {
     overlay.remove();
@@ -7203,7 +7044,7 @@ function showUpdateNotification() {
       if (updateAvailable) showUpdateNotification();
     }, 300000);
   });
-  
+
   // Make "Save & Update" the default action (Enter key)
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
@@ -7214,21 +7055,21 @@ function showUpdateNotification() {
       updateLaterBtn.click();
     }
   };
-  
+
   overlay.addEventListener('keydown', handleKeyPress);
   document.addEventListener('keydown', handleKeyPress);
-  
+
   // Focus the default button
   updateNowBtn.focus();
-  
+
   // Clean up keyboard listener when overlay is removed
   const cleanup = () => {
     document.removeEventListener('keydown', handleKeyPress);
     updateNotificationShown = false;
   };
-  
+
   overlay.addEventListener('remove', cleanup);
-  
+
   // Auto-dismiss after 30 seconds if no action
   setTimeout(() => {
     if (overlay.parentNode) {
@@ -7244,7 +7085,7 @@ function showUpdateNotification() {
 function performUpdate() {
   // Save current project state for restoration
   saveLastProjectState();
-  
+
   // Show update progress
   const overlay = document.querySelector('.update-notification');
   if (overlay) {
@@ -7256,7 +7097,7 @@ function performUpdate() {
       <p>Applying updates and restoring your project...</p>
     `;
   }
-  
+
   // Reload the page after a brief delay
   setTimeout(() => {
     window.location.reload(true);
@@ -7274,11 +7115,11 @@ function saveLastProjectState() {
       project: serializeProject(),
       wasUnsaved: hasUnsavedChanges
     };
-    
+
     localStorage.setItem(LAST_PROJECT_KEY, JSON.stringify(lastProjectData));
-    console.log('💾 Saved project state for update restoration');
+    Logger.info('Saved project state for update restoration');
   } catch (error) {
-    console.error('Failed to save project state:', error);
+    Logger.error('Failed to save project state:', error);
   }
 }
 
@@ -7288,16 +7129,16 @@ function saveLastProjectState() {
 function saveAutosaveProject() {
   try {
     if (nodes.length === 0) return; // Don't save empty projects
-    
+
     const autosaveData = {
       project: serializeProject(),
       timestamp: Date.now(),
       wasUnsaved: hasUnsavedChanges
     };
-    
+
     localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(autosaveData));
   } catch (error) {
-    console.error('Error saving autosave project:', error);
+    Logger.error('Error saving autosave project:', error);
   }
 }
 
@@ -7308,29 +7149,29 @@ function restoreAutosavedProject() {
   try {
     const stored = localStorage.getItem(AUTOSAVE_KEY);
     if (!stored) return false;
-    
+
     const autosaveData = JSON.parse(stored);
-    
+
     // Check if this autosave is recent (within 24 hours)
     const timeSinceAutosave = Date.now() - autosaveData.timestamp;
     if (timeSinceAutosave > 86400000) { // 24 hours
       localStorage.removeItem(AUTOSAVE_KEY);
       return false;
     }
-    
+
     // Clear the current project and restore from autosave
-    console.log('🔄 Restoring autosaved project...');
+    Logger.info('Restoring autosaved project...');
     clearProject();
     deserializeProject(autosaveData.project);
-    console.log(`✅ Restored autosaved project with ${nodes.length} nodes`);
-    
+    Logger.info(`Restored autosaved project with ${nodes.length} nodes`);
+
     // Verify main output consistency after restoration
     const dropdown = document.getElementById('main-output-select');
     const dropdownNodeId = parseInt(dropdown.value);
     const actualMainOutputId = mainOutputNode?.id;
-    
+
     if (dropdownNodeId !== actualMainOutputId) {
-      console.error('🚨 Main output sync error after autosave restoration!', {
+      Logger.error('Main output sync error after autosave restoration!', {
         dropdown: dropdownNodeId,
         actual: actualMainOutputId,
         mainOutputNode: mainOutputNode?.name
@@ -7338,20 +7179,20 @@ function restoreAutosavedProject() {
       // Force sync
       setMainOutput(mainOutputNode);
     } else {
-      console.log('✅ Main output sync verified after autosave restoration:', mainOutputNode?.name);
+      Logger.info('Main output sync verified after autosave restoration:', mainOutputNode?.name);
     }
-    
+
     // Restore unsaved status
     hasUnsavedChanges = autosaveData.wasUnsaved;
     updateProjectTitle();
-    
+
     // Show restoration notification
-    console.log('📄 Project restored from autosave');
-    
+    Logger.info('Project restored from autosave');
+
     return true;
-    
+
   } catch (error) {
-    console.error('Failed to restore autosaved project:', error);
+    Logger.error('Failed to restore autosaved project:', error);
     localStorage.removeItem(AUTOSAVE_KEY);
     return false;
   }
@@ -7364,29 +7205,29 @@ function restoreLastProject() {
   try {
     const stored = localStorage.getItem(LAST_PROJECT_KEY);
     if (!stored) return false;
-    
+
     const lastProjectData = JSON.parse(stored);
-    
+
     // Check if this restoration is recent (within 5 minutes)
     const timeSinceUpdate = Date.now() - lastProjectData.timestamp;
     if (timeSinceUpdate > 300000) {
       localStorage.removeItem(LAST_PROJECT_KEY);
       return false;
     }
-    
+
     // Clear the current project and restore from saved state
-    console.log('🔄 Clearing current project and restoring from backup...');
+    Logger.info('Clearing current project and restoring from backup...');
     clearProject();
     deserializeProject(lastProjectData.project);
-    console.log(`✅ Restored project with ${nodes.length} nodes`);
-    
+    Logger.info(`Restored project with ${nodes.length} nodes`);
+
     // Verify main output consistency after restoration
     const dropdown = document.getElementById('main-output-select');
     const dropdownNodeId = parseInt(dropdown.value);
     const actualMainOutputId = mainOutputNode?.id;
-    
+
     if (dropdownNodeId !== actualMainOutputId) {
-      console.error('🚨 Main output sync error after restoration!', {
+      Logger.error('Main output sync error after restoration!', {
         dropdown: dropdownNodeId,
         actual: actualMainOutputId,
         mainOutputNode: mainOutputNode?.name
@@ -7394,24 +7235,24 @@ function restoreLastProject() {
       // Force sync
       setMainOutput(mainOutputNode);
     } else {
-      console.log('✅ Main output sync verified after restoration:', mainOutputNode?.name);
+      Logger.info('Main output sync verified after restoration:', mainOutputNode?.name);
     }
-    
+
     // Restore unsaved status
     hasUnsavedChanges = lastProjectData.wasUnsaved;
     updateProjectTitle();
-    
+
     // Clean up the restoration data
     localStorage.removeItem(LAST_PROJECT_KEY);
-    
+
     // Show restoration notification
     showTemporaryNotification('✅ Project restored after update', 3000);
-    
-    console.log('🔄 Successfully restored project after update');
+
+    Logger.info('Successfully restored project after update');
     return true;
-    
+
   } catch (error) {
-    console.error('Failed to restore project:', error);
+    Logger.error('Failed to restore project:', error);
     localStorage.removeItem(LAST_PROJECT_KEY);
     return false;
   }
@@ -7424,12 +7265,12 @@ function showTemporaryNotification(message, duration = 3000) {
   const notification = document.createElement('div');
   notification.className = 'temp-notification';
   notification.textContent = message;
-  
+
   document.body.appendChild(notification);
-  
+
   // Fade in
   setTimeout(() => notification.classList.add('visible'), 100);
-  
+
   // Fade out and remove
   setTimeout(() => {
     notification.classList.remove('visible');
@@ -7443,9 +7284,9 @@ function showTemporaryNotification(message, duration = 3000) {
 function updateStatusIndicator(status) {
   const indicator = document.getElementById('update-status');
   if (!indicator) return;
-  
+
   indicator.className = 'update-status';
-  
+
   switch (status) {
     case 'checking':
       indicator.classList.add('checking');
@@ -7471,7 +7312,7 @@ function updateStatusIndicator(status) {
  */
 function startUpdateChecking() {
   updateStatusIndicator('checking');
-  
+
   // Initial check for modification times (without triggering notifications)
   checkForUpdates().then(() => {
     // Start periodic checking after initial load
@@ -7498,37 +7339,37 @@ function stopUpdateChecking() {
 function initUpdateSystem() {
   // First try to load project from URL parameter (shared projects)
   let restored = loadProjectFromURL();
-  
+
   if (!restored) {
     // Then try to restore autosaved project (normal browser refresh)
     restored = restoreAutosavedProject();
   }
-  
+
   if (!restored) {
     // Then try to restore project after potential update
     restored = restoreLastProject();
   }
-  
+
   if (!restored) {
     // If no restoration happened, start with normal initialization
     currentProject.createdAt = Date.now();
   }
-  
+
   // Start monitoring for updates
   startUpdateChecking();
-  
+
   // Save project state periodically for update safety
   setInterval(saveLastProjectState, 60000); // Every minute
-  
+
   // Save autosave state periodically for browser refreshes
   setInterval(saveAutosaveProject, 5000); // Every 5 seconds
-  
+
   // Initialize undo/redo and copy/paste buttons
   updateUndoRedoButtons();
   updateCopyPasteButtons();
-  
-  console.log(`🚀 Visual Synthesizer v${APP_VERSION} initialized`);
-  
+
+  Logger.info(`Visual Synthesizer v${APP_VERSION} initialized`);
+
   // Return whether a project was restored
   return restored;
 }
@@ -7580,11 +7421,11 @@ function hideRenameModal() {
 function saveRename() {
   const input = document.getElementById('project-name-input');
   const newName = input.value.trim();
-  
+
   if (newName && newName !== currentProject.name) {
     saveProject(newName);
   }
-  
+
   hideRenameModal();
 }
 
@@ -7595,10 +7436,10 @@ function refreshProjectsList() {
   const container = document.getElementById('projects-list');
   const sortBy = document.getElementById('sort-projects').value;
   const projects = getStoredProjects();
-  
+
   // Convert to array and sort
   const projectArray = Object.values(projects);
-  
+
   projectArray.sort((a, b) => {
     switch (sortBy) {
       case 'name':
@@ -7610,18 +7451,18 @@ function refreshProjectsList() {
         return (b.modifiedAt || 0) - (a.modifiedAt || 0);
     }
   });
-  
+
   if (projectArray.length === 0) {
     container.innerHTML = '<div class="projects-empty">No saved syntheses yet.<br>Create and save your first synthesis!</div>';
     return;
   }
-  
+
   container.innerHTML = projectArray.map(project => {
     const isCurrentProject = project.id === currentProject.id;
     const createdDate = project.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'Unknown';
     const modifiedDate = project.modifiedAt ? new Date(project.modifiedAt).toLocaleDateString() : 'Unknown';
     const nodeCount = project.nodes ? project.nodes.length : 0;
-    
+
     return `
       <div class="project-item ${isCurrentProject ? 'current' : ''}" data-project-id="${project.id}">
         <div class="project-info">
@@ -7643,11 +7484,11 @@ function refreshProjectsList() {
       </div>
     `;
   }).join('');
-  
+
   // Add event listeners to project items
   container.querySelectorAll('.project-item').forEach(item => {
     const projectId = item.dataset.projectId;
-    
+
     // Load project on main area click
     item.addEventListener('click', (e) => {
       if (!e.target.closest('.project-actions')) {
@@ -7655,13 +7496,13 @@ function refreshProjectsList() {
         hideProjectBrowser();
       }
     });
-    
+
     // Handle action buttons
     item.querySelectorAll('.project-action-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const action = btn.dataset.action;
-        
+
         if (action === 'load') {
           loadProject(projectId);
           hideProjectBrowser();
@@ -7737,7 +7578,7 @@ const LZString = {
     let out = [];
     let dictSize = 256;
     let w = "";
-    
+
     for (let i = 0; i < data.length; i++) {
       let c = data[i];
       let wc = w + c;
@@ -7749,28 +7590,28 @@ const LZString = {
         w = c;
       }
     }
-    
+
     if (w !== "") {
       out.push(dictionary[w] || w.charCodeAt(0));
     }
-    
+
     return String.fromCharCode.apply(null, out);
   },
-  
+
   decompress: function(compressed) {
     if (compressed == null) return "";
     if (compressed == "") return null;
-    
+
     let dictionary = {};
     let data = compressed.split("");
     let w = String.fromCharCode(data[0].charCodeAt(0));
     let result = [w];
     let dictSize = 256;
-    
+
     for (let i = 1; i < data.length; i++) {
       let k = data[i].charCodeAt(0);
       let entry;
-      
+
       if (dictionary[k]) {
         entry = dictionary[k];
       } else if (k === dictSize) {
@@ -7778,12 +7619,12 @@ const LZString = {
       } else {
         return null;
       }
-      
+
       result.push(entry);
       dictionary[dictSize++] = w + entry.charAt(0);
       w = entry;
     }
-    
+
     return result.join('');
   }
 };
@@ -7794,7 +7635,7 @@ const LZString = {
 function createShareableURL() {
   try {
     const projectData = serializeProject();
-    
+
     // Remove unnecessary metadata for sharing
     const shareData = {
       nodes: projectData.nodes,
@@ -7806,14 +7647,14 @@ function createShareableURL() {
       controlInputs: projectData.controlInputs,
       name: projectData.name
     };
-    
+
     const jsonString = JSON.stringify(shareData);
     const compressed = LZString.compress(jsonString);
     const base64 = btoa(unescape(encodeURIComponent(compressed)));
-    
+
     const baseURL = window.location.origin + window.location.pathname;
     const shareURL = `${baseURL}?project=${base64}`;
-    
+
     return {
       url: shareURL,
       originalSize: jsonString.length,
@@ -7821,9 +7662,9 @@ function createShareableURL() {
       base64Size: base64.length,
       urlLength: shareURL.length
     };
-    
+
   } catch (error) {
-    console.error('Error creating shareable URL:', error);
+    Logger.error('Error creating shareable URL:', error);
     return null;
   }
 }
@@ -7835,39 +7676,39 @@ function loadProjectFromURL() {
   try {
     const urlParams = new URLSearchParams(window.location.search);
     const projectParam = urlParams.get('project');
-    
+
     if (!projectParam) return false;
-    
-    console.log('🔗 Loading project from URL...');
-    
+
+    Logger.info('Loading project from URL...');
+
     const compressed = decodeURIComponent(escape(atob(projectParam)));
     const jsonString = LZString.decompress(compressed);
-    
+
     if (!jsonString) {
-      console.error('Failed to decompress project data');
+      Logger.error('Failed to decompress project data');
       return false;
     }
-    
+
     const projectData = JSON.parse(jsonString);
-    
+
     // Add missing metadata for compatibility
     projectData.id = null;
     projectData.createdAt = Date.now();
     projectData.modifiedAt = Date.now();
-    
+
     // Clear current project and load shared one
     clearProject();
     deserializeProject(projectData);
-    
-    console.log(`✅ Loaded shared project: ${projectData.name || 'Untitled'}`);
-    
+
+    Logger.info(`Loaded shared project: ${projectData.name || 'Untitled'}`);
+
     // Clear URL parameter
     window.history.replaceState({}, document.title, window.location.pathname);
-    
+
     return true;
-    
+
   } catch (error) {
-    console.error('Error loading project from URL:', error);
+    Logger.error('Error loading project from URL:', error);
     return false;
   }
 }
@@ -7878,52 +7719,52 @@ function loadProjectFromURL() {
 function importProjectFromText(text) {
   try {
     text = text.trim();
-    
+
     if (!text) {
       alert('Please enter a URL or JSON data');
       return false;
     }
-    
+
     let projectData = null;
-    
+
     // Check if it's a URL
     if (text.startsWith('http')) {
       const url = new URL(text);
       const projectParam = url.searchParams.get('project');
-      
+
       if (!projectParam) {
         alert('No project data found in URL');
         return false;
       }
-      
+
       const compressed = decodeURIComponent(escape(atob(projectParam)));
       const jsonString = LZString.decompress(compressed);
       projectData = JSON.parse(jsonString);
-      
+
     } else {
       // Try to parse as JSON directly
       projectData = JSON.parse(text);
     }
-    
+
     if (!projectData || !projectData.nodes) {
       alert('Invalid project data');
       return false;
     }
-    
+
     // Add missing metadata
     projectData.id = null;
     projectData.createdAt = Date.now();
     projectData.modifiedAt = Date.now();
-    
+
     // Clear current project and load imported one
     clearProject();
     deserializeProject(projectData);
-    
-    console.log(`✅ Imported project: ${projectData.name || 'Untitled'}`);
+
+    Logger.info(`Imported project: ${projectData.name || 'Untitled'}`);
     return true;
-    
+
   } catch (error) {
-    console.error('Error importing project:', error);
+    Logger.error('Error importing project:', error);
     alert('Failed to import project. Please check the data format.');
     return false;
   }
@@ -7935,21 +7776,21 @@ function importProjectFromText(text) {
 function showShareModal() {
   const modal = document.getElementById('share-modal');
   const shareURL = createShareableURL();
-  
+
   if (!shareURL) {
     alert('Failed to create shareable URL');
     return;
   }
-  
+
   // Update URL field
   document.getElementById('share-url').value = shareURL.url;
-  
+
   // Update statistics
   document.getElementById('stats-nodes').textContent = nodes.length;
   document.getElementById('stats-size').textContent = `${shareURL.originalSize} bytes`;
   document.getElementById('stats-compressed').textContent = `${shareURL.compressedSize} bytes`;
   document.getElementById('stats-url-length').textContent = `${shareURL.urlLength} chars`;
-  
+
   // Show warning if URL is very long
   if (shareURL.urlLength > 2000) {
     document.getElementById('stats-url-length').style.color = '#ef4444';
@@ -7958,7 +7799,7 @@ function showShareModal() {
     document.getElementById('stats-url-length').style.color = '';
     document.getElementById('stats-url-length').title = '';
   }
-  
+
   modal.classList.add('visible');
 }
 
@@ -7974,24 +7815,24 @@ function hideShareModal() {
  */
 async function copyShareURL() {
   const urlField = document.getElementById('share-url');
-  
+
   try {
     await navigator.clipboard.writeText(urlField.value);
-    
+
     // Visual feedback
     const button = document.getElementById('copy-url-btn');
     const originalText = button.innerHTML;
     button.innerHTML = '<span class="material-icons">check</span>Copied!';
-    
+
     setTimeout(() => {
       button.innerHTML = originalText;
     }, 2000);
-    
+
   } catch (error) {
     // Fallback for older browsers
     urlField.select();
     document.execCommand('copy');
-    console.log('URL copied to clipboard');
+    Logger.info('URL copied to clipboard');
   }
 }
 
