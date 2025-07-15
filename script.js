@@ -4526,6 +4526,10 @@ function showNodeProperties(node) {
       updateConnections();
       markUnsaved();
       saveState(`Change input connection`);
+      
+      // Refresh the properties panel to show updated connections
+      // This is important for Composite nodes to show their inputs properly
+      setTimeout(() => showNodeProperties(node), 10);
     });
   });
 
@@ -5948,6 +5952,25 @@ function setNodeUniforms(node) {
     const scaleLoc = gl.getUniformLocation(program, 'u_scale');
     if (scaleLoc) {
       gl.uniform2f(scaleLoc, node.params.scaleX || 1.0, node.params.scaleY || 1.0);
+    }
+  }
+  
+  // Special handling for Composite node
+  if (node.type === 'Composite') {
+    // Count how many inputs are connected
+    const activeInputs = node.inputs.filter(input => input !== null).length;
+    const activeInputsLoc = gl.getUniformLocation(program, 'u_activeInputs');
+    if (activeInputsLoc) {
+      gl.uniform1i(activeInputsLoc, activeInputs);
+    }
+    
+    // Set opacity uniforms
+    for (let i = 1; i <= 4; i++) {
+      const opacityLoc = gl.getUniformLocation(program, `u_opacity${i}`);
+      if (opacityLoc) {
+        const opacityValue = node.params[`opacity${i}`] || 1.0;
+        gl.uniform1f(opacityLoc, opacityValue);
+      }
     }
   }
 
