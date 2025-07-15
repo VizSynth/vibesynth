@@ -3696,27 +3696,6 @@ function showNodeProperties(node) {
       saveState(`Change control connection`);
     });
   });
-          startMIDIMapping(node, param);
-        } else if (value.startsWith('audio:')) {
-          // Handle audio mapping
-          const audioBand = value.split(':')[1];
-          createAudioMapping(node, param, audioBand);
-        } else if (value.startsWith('color:')) {
-          // Handle color mapping
-          const colorComponent = value.split(':')[1];
-          createColorMapping(node, param, colorComponent);
-        } else if (value.startsWith('cursor:')) {
-          // Handle cursor mapping
-          const cursorComponent = value.split(':')[1];
-          createCursorMapping(node, param, cursorComponent);
-        } else if (value.startsWith('camera:')) {
-          // Handle camera mapping
-          const cameraComponent = value.split(':')[1];
-          createCameraMapping(node, param, cameraComponent);
-        }
-        
-        // Reset dropdown to default state
-        e.target.value = '';
       }
     });
   });
