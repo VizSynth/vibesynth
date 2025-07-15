@@ -2,19 +2,15 @@
 
 ## Critical Issues
 
-### 1. Layer Node Texture Binding Failure
-**Status**: 🔴 CRITICAL  
-**Description**: Layer nodes are not properly reading from both input textures. The debug split view shows the same content on both sides.
+### 1. Layer Node Texture Binding Failure [FIXED]
+**Status**: ✅ FIXED  
+**Description**: Layer nodes were not properly reading from both input textures. Both texture samplers were reading from the same texture unit.
 
-**Symptoms**:
-- Debug split view (when `window.debugLayerSplit = true`) shows identical content on left and right
-- Console shows texture binding attempts but uniforms receive incorrect values
-- Blend modes have no effect because only one texture is being read
-
-**Root Cause Analysis**:
-- Uniform values show 0 for both u_texture1 and u_texture2
-- Texture binding verification shows textures are bound but shader isn't reading them
-- Possible issue with texture unit assignment or shader uniform binding
+**Solution Applied**:
+- Rewrote texture binding logic to bind all textures first, then set uniforms
+- Fixed texture unit assignment ensuring each sampler gets the correct unit index
+- Added swap inputs button (⇄) to easily reverse base/blend layers
+- Added debug indicators (disabled by default) to verify texture sampling
 
 ### 2. Input/Output Preview Canvases Not Rendering
 **Status**: 🔴 CRITICAL  

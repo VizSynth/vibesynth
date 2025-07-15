@@ -371,5 +371,28 @@
   
   <!-- Test suite (only in development) -->
   <script src="test-suite.js"></script>
+  
+  <!-- Logger Control Panel -->
+  <div id="logger-panel" style="position: fixed; bottom: 10px; right: 10px; background: #1a1a1a; border: 1px solid #333; padding: 10px; border-radius: 8px; font-size: 12px; opacity: 0.8; z-index: 10000;">
+    <div style="color: #fff; margin-bottom: 5px;">Logger Level:</div>
+    <select id="logger-level" style="background: #2a2a2a; color: #fff; border: 1px solid #444; padding: 3px; border-radius: 4px;">
+      <option value="0">Error</option>
+      <option value="1">Warn</option>
+      <option value="2" selected>Info</option>
+      <option value="3">Debug</option>
+      <option value="4">Trace</option>
+    </select>
+  </div>
+  
+  <script>
+    // Logger level control
+    document.getElementById('logger-level').addEventListener('change', (e) => {
+      const level = parseInt(e.target.value);
+      if (window.Logger) {
+        window.Logger.setLevel(level);
+        console.log('Logger level set to:', ['Error', 'Warn', 'Info', 'Debug', 'Trace'][level]);
+      }
+    });
+  </script>
 </body>
 </html>

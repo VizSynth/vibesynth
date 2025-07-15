@@ -6,6 +6,73 @@
  * drag-and-drop functionality, and professional visual compositing capabilities.
  */
 
+/** Logging System with Levels */
+const LogLevel = {
+  ERROR: 0,
+  WARN: 1,
+  INFO: 2,
+  DEBUG: 3,
+  TRACE: 4
+};
+
+const Logger = {
+  level: LogLevel.INFO, // Default log level
+  
+  setLevel(level) {
+    this.level = level;
+  },
+  
+  error(...args) {
+    if (this.level >= LogLevel.ERROR) console.error(...args);
+  },
+  
+  warn(...args) {
+    if (this.level >= LogLevel.WARN) console.warn(...args);
+  },
+  
+  info(...args) {
+    if (this.level >= LogLevel.INFO) console.log(...args);
+  },
+  
+  debug(...args) {
+    if (this.level >= LogLevel.DEBUG) console.log('🔍', ...args);
+  },
+  
+  trace(...args) {
+    if (this.level >= LogLevel.TRACE) console.log('🔬', ...args);
+  },
+  
+  // Convenience method for temporary debugging
+  temp(...args) {
+    console.log('🚧 TEMP:', ...args);
+  }
+};
+
+// Make logger globally accessible
+window.Logger = Logger;
+window.LogLevel = LogLevel;
+
+// Add console helper
+Logger.info('📋 Logger commands:');
+Logger.info('  - Set to debug: Logger.setLevel(LogLevel.DEBUG)');
+Logger.info('  - Set to info: Logger.setLevel(LogLevel.INFO)');
+Logger.info('  - Set to error only: Logger.setLevel(LogLevel.ERROR)');
+Logger.info('  - Set to trace: Logger.setLevel(LogLevel.TRACE)');
+
+// Add Layer debugging info
+Logger.info('🎨 Layer debugging:');
+Logger.info('  - debugLayer() - Check Layer node state');
+Logger.info('  - testLayerOpacity() - Test different opacity values');
+Logger.info('  - testLayerBlend() - Test different blend modes');
+Logger.info('  - testSimpleMix() - Set to 50% opacity Normal mode');
+Logger.info('  - swapLayerInputs() - Swap base and blend inputs');
+Logger.info('  - window.debugLayerSplit = true - Enable split view');
+Logger.info('  - Look for colored squares:');
+Logger.info('    Top-left: Red=Normal, Green=Multiply, Blue=Screen, Yellow=Overlay');
+Logger.info('    Bottom-left: Base texture sample');
+Logger.info('    Bottom-right: Blend texture sample');
+Logger.info('  - Use the ⇄ button in properties to swap inputs');
+
 /** Parameter Validation System */
 const PARAMETER_CONSTRAINTS = {
   // Numeric parameters with ranges
@@ -618,6 +685,122 @@ let mainOutputNode = null;
 // Debug mode for Layer nodes - set to true to see split view
 window.debugLayerSplit = false;
 
+// Test function for Layer blending
+window.testLayerBlend = function() {
+  const layerNode = nodes.find(n => n.type === 'Layer');
+  if (!layerNode) {
+    console.log('❌ No Layer node found');
+    return;
+  }
+  
+  Logger.info('Testing Layer blend modes...');
+  const modes = ['Normal', 'Multiply', 'Screen', 'Overlay'];
+  let currentIndex = 0;
+  
+  const testInterval = setInterval(() => {
+    if (currentIndex >= modes.length) {
+      clearInterval(testInterval);
+      Logger.info('Test complete. Check visual output.');
+      return;
+    }
+    
+    const mode = modes[currentIndex];
+    layerNode.params.blendMode = mode;
+    Logger.info(`Testing ${mode} mode...`);
+    currentIndex++;
+  }, 2000);
+  
+  Logger.info('Running blend mode test - watch the output change every 2 seconds');
+};
+
+// Debug function to check Layer node state
+window.debugLayer = function() {
+  const layerNode = nodes.find(n => n.type === 'Layer');
+  if (!layerNode) {
+    console.log('❌ No Layer node found');
+    return;
+  }
+  
+  console.log('Layer node state:', {
+    name: layerNode.name,
+    blendMode: layerNode.params.blendMode,
+    opacity: layerNode.params.opacity,
+    input1: layerNode.inputs[0]?.name || 'none',
+    input2: layerNode.inputs[1]?.name || 'none',
+    hasProgram: !!layerNode.program
+  });
+  
+  // Check uniforms
+  if (layerNode.program && gl) {
+    gl.useProgram(layerNode.program);
+    const blendLoc = gl.getUniformLocation(layerNode.program, 'u_blendMode');
+    const opacityLoc = gl.getUniformLocation(layerNode.program, 'u_opacity');
+    
+    if (blendLoc !== null) {
+      const blendValue = gl.getUniform(layerNode.program, blendLoc);
+      console.log('u_blendMode uniform value:', blendValue);
+    }
+    
+    if (opacityLoc !== null) {
+      const opacityValue = gl.getUniform(layerNode.program, opacityLoc);
+      console.log('u_opacity uniform value:', opacityValue);
+    }
+  }
+};
+
+// Quick test to see if blending works with different opacity
+window.testLayerOpacity = function() {
+  const layerNode = nodes.find(n => n.type === 'Layer');
+  if (!layerNode) {
+    console.log('❌ No Layer node found');
+    return;
+  }
+  
+  console.log('Testing Layer opacity...');
+  const opacities = [0, 0.25, 0.5, 0.75, 1.0];
+  let index = 0;
+  
+  const interval = setInterval(() => {
+    if (index >= opacities.length) {
+      clearInterval(interval);
+      console.log('Test complete');
+      return;
+    }
+    
+    layerNode.params.opacity = opacities[index];
+    console.log(`Opacity: ${opacities[index]}`);
+    index++;
+  }, 1500);
+};
+
+// Force simple 50/50 mix to test
+window.testSimpleMix = function() {
+  const layerNode = nodes.find(n => n.type === 'Layer');
+  if (!layerNode) {
+    console.log('❌ No Layer node found');
+    return;
+  }
+  
+  // Set to normal mode with 50% opacity - should show 50% of each input
+  layerNode.params.blendMode = 'Normal';
+  layerNode.params.opacity = 0.5;
+  console.log('Set Layer to Normal mode at 50% opacity - you should see both inputs mixed');
+};
+
+// Swap Layer inputs to test if they're reversed
+window.swapLayerInputs = function() {
+  const layerNode = nodes.find(n => n.type === 'Layer');
+  if (!layerNode) {
+    console.log('❌ No Layer node found');
+    return;
+  }
+  
+  const temp = layerNode.inputs[0];
+  layerNode.inputs[0] = layerNode.inputs[1];
+  layerNode.inputs[1] = temp;
+  console.log('Swapped Layer inputs - Base and Blend are now reversed');
+};
+
 // Node type definitions for UI
 const nodeDefinitions = {
   // Sources
@@ -633,7 +816,7 @@ const nodeDefinitions = {
   
   // Compositing
   Mix: { inputs: [{ name: 'Input 1' }, { name: 'Input 2' }] },
-  Layer: { inputs: [{ name: 'Base' }, { name: 'Blend' }] },
+  Layer: { inputs: [{ name: 'Base (Bottom)' }, { name: 'Blend (Top)' }] },
   Composite: { inputs: [{ name: 'Input 1' }, { name: 'Input 2' }, { name: 'Input 3' }, { name: 'Input 4' }] },
   
   // Control Inputs
@@ -1215,7 +1398,7 @@ function createFallbackTexture() {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   
-  console.log('✅ Created fallback texture for failed nodes');
+  Logger.debug('Created fallback texture for failed nodes');
   return fallbackTexture;
 }
 
@@ -1266,7 +1449,7 @@ function initWebGL() {
     // Create fallback texture for failed nodes
     createFallbackTexture();
     
-    console.log('✅ WebGL initialized successfully');
+    Logger.info('WebGL initialized successfully');
     return true;
     
   } catch (error) {
@@ -1628,71 +1811,100 @@ function compileShaders() {
   `;
   programs.mix = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragMix));
 
-  // Layer shader with blend modes
+  // Layer shader - complete rewrite for proper blending
   const fragLayer = `
     precision mediump float;
-    uniform sampler2D u_texture1;
-    uniform sampler2D u_texture2;
+    uniform sampler2D u_texture1;  // Base layer (bottom)
+    uniform sampler2D u_texture2;  // Blend layer (top)
     uniform float u_opacity;
     uniform float u_blendMode;
     varying vec2 v_uv;
     
-    vec3 blendMultiply(vec3 base, vec3 blend) { return base * blend; }
-    vec3 blendScreen(vec3 base, vec3 blend) { return 1.0 - (1.0 - base) * (1.0 - blend); }
-    vec3 blendOverlay(vec3 base, vec3 blend) {
-      return mix(2.0 * base * blend, 1.0 - 2.0 * (1.0 - base) * (1.0 - blend), step(0.5, base));
-    }
-    
     void main() {
-      vec4 base = texture2D(u_texture1, v_uv);
-      vec4 blend = texture2D(u_texture2, v_uv);
+      // Sample both textures
+      vec4 baseColor = texture2D(u_texture1, v_uv);
+      vec4 blendColor = texture2D(u_texture2, v_uv);
+      
+      // Extract RGB values
+      vec3 base = baseColor.rgb;
+      vec3 blend = blendColor.rgb;
       
       // Debug mode: show split view when blendMode is negative
       if (u_blendMode < -0.5) {
-        // Split screen debug view
-        if (v_uv.x < 0.33) {
-          gl_FragColor = vec4(base.rgb, 1.0); // Left third: texture1
-        } else if (v_uv.x < 0.66) {
-          gl_FragColor = vec4(blend.rgb, 1.0); // Middle third: texture2
+        if (v_uv.x < 0.5) {
+          gl_FragColor = vec4(base, 1.0);  // Left: base texture
         } else {
-          // Right third: difference to highlight issues
-          vec3 diff = abs(base.rgb - blend.rgb);
-          gl_FragColor = vec4(diff, 1.0);
+          gl_FragColor = vec4(blend, 1.0); // Right: blend texture
         }
         return;
       }
       
+      // Show blend mode indicator in corner (can be disabled)
+      bool showDebugIndicators = false; // Set to true to see debug indicators
+      
+      if (showDebugIndicators) {
+        if (v_uv.x < 0.1 && v_uv.y < 0.1) {
+          float mode = u_blendMode;
+          if (mode < 0.5) {
+            gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0); // Red = Normal
+          } else if (mode < 1.5) {
+            gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0); // Green = Multiply
+          } else if (mode < 2.5) {
+            gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0); // Blue = Screen
+          } else {
+            gl_FragColor = vec4(1.0, 1.0, 0.0, 1.0); // Yellow = Overlay
+          }
+          return;
+        }
+        
+        // Show texture samples in bottom corners
+        if (v_uv.y > 0.9) {
+          if (v_uv.x < 0.1) {
+            // Bottom left: show base texture sample
+            gl_FragColor = vec4(base, 1.0);
+            return;
+          } else if (v_uv.x > 0.9) {
+            // Bottom right: show blend texture sample
+            gl_FragColor = vec4(blend, 1.0);
+            return;
+          }
+        }
+      }
+      
+      // Calculate blended result based on mode
       vec3 result;
       float mode = u_blendMode;
       
-      // Photoshop-style blend modes
-      vec3 blended;
-      
       if (mode < 0.5) {
-        // Normal: standard alpha blending - just use the blend color
-        blended = blend.rgb;
-      } else if (mode < 1.5) {
-        // Multiply: darkens (base * blend)
-        blended = base.rgb * blend.rgb;
-      } else if (mode < 2.5) {
-        // Screen: lightens (inverse multiply)
-        blended = vec3(1.0) - (vec3(1.0) - base.rgb) * (vec3(1.0) - blend.rgb);
-      } else if (mode < 3.5) {
-        // Overlay: combines multiply and screen
-        vec3 overlayed;
-        overlayed.r = base.r < 0.5 ? (2.0 * base.r * blend.r) : (1.0 - 2.0 * (1.0 - base.r) * (1.0 - blend.r));
-        overlayed.g = base.g < 0.5 ? (2.0 * base.g * blend.g) : (1.0 - 2.0 * (1.0 - base.g) * (1.0 - blend.g));
-        overlayed.b = base.b < 0.5 ? (2.0 * base.b * blend.b) : (1.0 - 2.0 * (1.0 - base.b) * (1.0 - blend.b));
-        blended = overlayed;
-      } else {
+        // Normal mode - just the blend layer
+        result = blend;
+      } 
+      else if (mode < 1.5) {
+        // Multiply mode - darkens
+        result = base * blend;
+      } 
+      else if (mode < 2.5) {
+        // Screen mode - lightens
+        result = vec3(1.0) - (vec3(1.0) - base) * (vec3(1.0) - blend);
+      } 
+      else if (mode < 3.5) {
+        // Overlay mode - combination of multiply and screen
+        result = vec3(
+          base.r < 0.5 ? (2.0 * base.r * blend.r) : (1.0 - 2.0 * (1.0 - base.r) * (1.0 - blend.r)),
+          base.g < 0.5 ? (2.0 * base.g * blend.g) : (1.0 - 2.0 * (1.0 - base.g) * (1.0 - blend.g)),
+          base.b < 0.5 ? (2.0 * base.b * blend.b) : (1.0 - 2.0 * (1.0 - base.b) * (1.0 - blend.b))
+        );
+      } 
+      else {
         // Fallback to normal
-        blended = blend.rgb;
+        result = blend;
       }
       
-      // Apply opacity to blend between base and blended result
-      vec3 result = mix(base.rgb, blended, u_opacity);
+      // Apply opacity
+      vec3 finalColor = mix(base, result, u_opacity);
       
-      gl_FragColor = vec4(result, 1.0);
+      // Output with full alpha
+      gl_FragColor = vec4(finalColor, 1.0);
     }
   `;
   programs.layer = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragLayer));
@@ -2447,8 +2659,7 @@ function allocateNodeFBO(node) {
     const width = canvas.width;
     const height = canvas.height;
     
-    // Create texture with detailed logging
-    console.log(`Creating texture for ${node.name}...`);
+    // Create texture
     node.texture = gl.createTexture();
     if (!node.texture) {
       console.error(`Failed to create texture for ${node.name}`);
@@ -2459,8 +2670,7 @@ function allocateNodeFBO(node) {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     setTextureParams();
     
-    // Create framebuffer with detailed logging
-    console.log(`Creating framebuffer for ${node.name}...`);
+    // Create framebuffer
     node.fbo = gl.createFramebuffer();
     if (!node.fbo) {
       console.error(`Failed to create framebuffer for ${node.name}`);
@@ -3390,7 +3600,14 @@ function showNodeProperties(node) {
   const nodeDefinition = nodeDefinitions[node.type];
   if (nodeDefinition && nodeDefinition.inputs && nodeDefinition.inputs.length > 0) {
     html += `<div class="property-group">
-      <h5><span class="section-icon">📥</span> Data Inputs</h5>`;
+      <h5><span class="section-icon">📥</span> Data Inputs`;
+    
+    // Add swap button for nodes with exactly 2 inputs
+    if (nodeDefinition.inputs.length === 2 && (node.type === 'Layer' || node.type === 'Mix')) {
+      html += ` <button class="swap-inputs-btn" title="Swap inputs" style="float: right; font-size: 18px; background: none; border: none; cursor: pointer; color: #999;">⇄</button>`;
+    }
+    
+    html += `</h5>`;
     
     nodeDefinition.inputs.forEach((inputDef, index) => {
       const currentInput = node.inputs[index];
@@ -3660,6 +3877,11 @@ function showNodeProperties(node) {
       // Use validated/corrected value
       node.params[param] = validation.value;
       
+      // Debug logging for Layer blend mode changes
+      if (node.type === 'Layer' && (param === 'blendMode' || param === 'opacity')) {
+        Logger.info(`Layer ${node.name} ${param} changed to: ${validation.value}`);
+      }
+      
       // Update input to show corrected value if it was changed
       if (validation.value !== value) {
         e.target.value = validation.value;
@@ -3717,6 +3939,27 @@ function showNodeProperties(node) {
       saveState(`Change input connection`);
     });
   });
+  
+  // Add event listener for swap inputs button
+  const swapBtn = panel.querySelector('.swap-inputs-btn');
+  if (swapBtn) {
+    swapBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      
+      // Swap the inputs
+      const temp = node.inputs[0];
+      node.inputs[0] = node.inputs[1];
+      node.inputs[1] = temp;
+      
+      Logger.info(`Swapped inputs for ${node.name}`);
+      
+      // Update the UI to reflect the swap
+      showNodeProperties(node);
+      updateConnections();
+      markUnsaved();
+      saveState('Swap inputs');
+    });
+  }
   
   // Add event listeners for control input connections
   panel.querySelectorAll('.control-select').forEach(select => {
@@ -4655,7 +4898,7 @@ function renderNode(node, time) {
   // Debug log for Layer and Mix nodes
   if (node.type === 'Layer' || node.type === 'Mix') {
     const validInputs = node.inputs.filter(n => n && !n.deleted && n.texture);
-    console.log(`🎯 Rendering ${node.type} node: ${node.name}, valid inputs: ${validInputs.length}/2 [${validInputs.map(n => n.name).join(', ')}]`);
+    Logger.debug(`Rendering ${node.type} node: ${node.name}, valid inputs: ${validInputs.length}/2 [${validInputs.map(n => n.name).join(', ')}]`);
     
     // Special debugging for Layer nodes
     if (node.type === 'Layer') {
@@ -4670,13 +4913,8 @@ function renderNode(node, time) {
         hasProgram: !!node.program
       };
       
-      console.log(`🔍 Layer ${node.name} details:`, layerInfo);
+      Logger.debug(`Layer ${node.name} details:`, layerInfo);
       updateDebugPanel('layer', layerInfo);
-    }
-    
-    // Warn if insufficient inputs for blending
-    if (validInputs.length < 2) {
-      console.warn(`⚠️ ${node.type} node "${node.name}" has only ${validInputs.length} valid input(s), blending may not work properly`);
     }
   }
   
@@ -4799,7 +5037,6 @@ function renderNode(node, time) {
     
     // Check if any input texture is attached to the framebuffer we're about to render to
     if (inputNode.fbo === node.fbo) {
-      console.warn(`🚨 FRAMEBUFFER-TEXTURE FEEDBACK DETECTED: ${node.name} trying to use texture from same framebuffer`);
       return true;
     }
     return false;
@@ -4816,7 +5053,7 @@ function renderNode(node, time) {
     // Clear any errors before framebuffer operations
     let error = gl.getError();
     while (error !== gl.NO_ERROR) {
-      console.warn(`Clearing previous error before ${node.name} framebuffer ops:`, error);
+      Logger.trace(`Clearing previous error before ${node.name} framebuffer ops:`, error);
       error = gl.getError();
     }
     
@@ -4845,10 +5082,15 @@ function renderNode(node, time) {
   
   gl.viewport(0, 0, canvas.width, canvas.height);
   
+  // IMPORTANT: Clear the framebuffer before rendering
+  // This prevents accumulation of data and ensures clean output
+  gl.clearColor(0, 0, 0, 0);  // Clear to transparent black
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  
   // Clear any previous WebGL errors before drawing
   let error = gl.getError();
   while (error !== gl.NO_ERROR) {
-    console.warn(`Clearing previous WebGL error before ${node.name} render:`, error);
+    Logger.trace(`Clearing previous WebGL error before ${node.name} render:`, error);
     error = gl.getError();
   }
   
@@ -5001,13 +5243,15 @@ function setNodeUniforms(node) {
         const modes = { 'Normal': 0, 'Multiply': 1, 'Screen': 2, 'Overlay': 3 };
         let modeValue = modes[value] || 0;
         
+        // Store the numeric value for debugging
+        node.params.blendModeValue = modeValue;
+        
         // Check for debug mode
         if (window.debugLayerSplit && node.type === 'Layer') {
           modeValue = -1; // This triggers split view in shader
-          console.log(`🔍 Layer ${node.name} in DEBUG SPLIT VIEW mode`);
+          Logger.info(`Layer ${node.name} in DEBUG SPLIT VIEW mode`);
         }
         
-        console.log(`🎨 Setting blend mode for ${node.name}: "${value}" -> ${modeValue}, loc:`, loc);
         if (loc !== null && loc !== -1) {
           gl.uniform1f(loc, parseFloat(modeValue));
           // Verify the uniform was set
@@ -5092,13 +5336,15 @@ function setNodeUniforms(node) {
  * Bind input textures for a node
  */
 function bindNodeInputTextures(node) {
-  // Minimal debug for Layer inputs
-  if (node.type === 'Layer' && window.debugLayerTextures) {
-    console.log(`Layer ${node.name} inputs:`, 
-      node.inputs.map((inp, i) => inp ? inp.name : 'empty'));
+  // CRITICAL FIX: For multi-texture nodes, bind ALL textures FIRST, then set uniforms
+  // This ensures all texture units remain bound when the shader executes
+  
+  if (node.type === 'Layer') {
+    Logger.info(`Binding textures for Layer ${node.name}:`);
   }
-
-  // Set input textures
+  
+  // First pass: Bind all textures to their respective texture units
+  const textureBindings = [];
   node.inputs.forEach((inputNode, index) => {
     if (inputNode && inputNode.texture && !inputNode.deleted) {
       // PREVENT FEEDBACK LOOP: Enhanced detection for Mix/Layer nodes
@@ -5123,45 +5369,42 @@ function bindNodeInputTextures(node) {
         }
       }
       
-      // Simple texture binding without problematic validation
-      try {
-        gl.bindTexture(gl.TEXTURE_2D, inputNode.texture);
-      } catch (e) {
-        console.warn(`Failed to bind texture for ${inputNode.name}, using fallback`);
-        inputNode.texture = createFallbackTexture();
-        gl.bindTexture(gl.TEXTURE_2D, inputNode.texture);
+      // Activate and bind texture to its unit
+      const textureUnit = index;
+      gl.activeTexture(gl.TEXTURE0 + textureUnit);
+      gl.bindTexture(gl.TEXTURE_2D, inputNode.texture);
+      
+      if (node.type === 'Layer') {
+        Logger.info(`  Texture unit ${textureUnit}: ${inputNode.name}`);
       }
       
-      // Special handling for multi-input nodes that expect numbered textures starting from 1
-      const isMultiInputNode = node.type === 'Mix' || node.type === 'Layer' || node.type === 'Composite';
-      const uniformName = isMultiInputNode ? `u_texture${index + 1}` : (index === 0 ? "u_texture" : `u_texture${index + 1}`);
-      const loc = gl.getUniformLocation(node.program, uniformName);
-      if (loc !== null && loc !== -1) {
-        // CRITICAL FIX: For texture samplers, the uniform value should be the texture unit INDEX
-        // not the actual GL constant. u_texture1 should get value 0, u_texture2 should get value 1
-        const textureUnit = index; // This is 0 for first input, 1 for second input
-        gl.activeTexture(gl.TEXTURE0 + textureUnit);
-        gl.bindTexture(gl.TEXTURE_2D, inputNode.texture);
-        
-        // Set the sampler uniform to the texture unit index
-        gl.uniform1i(loc, textureUnit);
-        
-        // Minimal debug logging for Layer nodes
-        if (node.type === 'Layer' && window.debugLayerTextures) {
-          const testVal = gl.getUniform(node.program, loc);
-          console.log(`Layer ${uniformName}: unit=${textureUnit}, value=${testVal}`);
-        }
-        
-        // Verify texture binding succeeded
-        const bindError = gl.getError();
-        if (bindError !== gl.NO_ERROR) {
-          console.error(`🚨 Error binding texture for ${inputNode.name} to ${uniformName}:`, bindError);
-        }
-      } else {
-        // Only warn if this is actually an expected uniform (not just an unconnected optional input)
-        if (node.type === 'Layer' || node.type === 'Mix' || node.type === 'Composite') {
-          console.warn(`⚠️ Could not find uniform ${uniformName} in ${node.name} shader - this may indicate a shader compilation issue`);
-        }
+      // Store binding info for uniform setting
+      textureBindings.push({
+        index: index,
+        textureUnit: textureUnit,
+        inputNode: inputNode
+      });
+    }
+  });
+  
+  // Second pass: Set all uniforms AFTER all textures are bound
+  textureBindings.forEach(binding => {
+    const isMultiInputNode = node.type === 'Mix' || node.type === 'Layer' || node.type === 'Composite';
+    const uniformName = isMultiInputNode ? `u_texture${binding.index + 1}` : (binding.index === 0 ? "u_texture" : `u_texture${binding.index + 1}`);
+    
+    const loc = gl.getUniformLocation(node.program, uniformName);
+    if (loc !== null && loc !== -1) {
+      gl.uniform1i(loc, binding.textureUnit);
+      
+      if (node.type === 'Layer') {
+        // Verify the uniform was set correctly
+        const uniformValue = gl.getUniform(node.program, loc);
+        Logger.info(`  ${uniformName} uniform set to: ${uniformValue}`);
+      }
+    } else {
+      // Only warn if this is actually an expected uniform (not just an unconnected optional input)
+      if (binding.index < 2 || node.type === 'Composite') { // First 2 inputs or Composite node
+        console.warn(`Could not find uniform ${uniformName} for ${node.name}`);
       }
     }
   });
