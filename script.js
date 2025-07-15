@@ -618,6 +618,35 @@ let mainOutputNode = null;
 // Debug mode for Layer nodes - set to true to see split view
 window.debugLayerSplit = false;
 
+// Node type definitions for UI
+const nodeDefinitions = {
+  // Sources
+  Oscillator: { inputs: [] },
+  Noise: { inputs: [] },
+  Shape: { inputs: [] },
+  Video: { inputs: [] },
+  
+  // Effects
+  Transform: { inputs: [{ name: 'Input' }] },
+  ColorAdjust: { inputs: [{ name: 'Input' }] },
+  Kaleidoscope: { inputs: [{ name: 'Input' }] },
+  
+  // Compositing
+  Mix: { inputs: [{ name: 'Input 1' }, { name: 'Input 2' }] },
+  Layer: { inputs: [{ name: 'Base' }, { name: 'Blend' }] },
+  Composite: { inputs: [{ name: 'Input 1' }, { name: 'Input 2' }, { name: 'Input 3' }, { name: 'Input 4' }] },
+  
+  // Control Inputs
+  MIDIInput: { inputs: [] },
+  AudioInput: { inputs: [] },
+  CursorInput: { inputs: [] },
+  CameraInput: { inputs: [] },
+  RandomInput: { inputs: [] },
+  
+  // System
+  Canvas: { inputs: [{ name: 'Input' }] }
+};
+
 /** Undo/Redo system */
 const undoStack = [];
 const redoStack = [];
@@ -2548,7 +2577,11 @@ function createNodeElement(node) {
   node.element = nodeEl;
 
   // Add event listeners
-  nodeEl.addEventListener('click', () => selectNode(node));
+  nodeEl.addEventListener('click', (e) => {
+    console.log('Node clicked:', node.name);
+    e.stopPropagation();
+    selectNode(node);
+  });
   
   const enableToggle = nodeEl.querySelector('.node-enabled');
   enableToggle.addEventListener('click', (e) => {
@@ -3304,13 +3337,14 @@ function selectNode(node) {
   console.log('🎯 selectNode called with:', node ? node.name : 'null');
   
   // Deselect previous
-  if (selectedNode) {
+  if (selectedNode && selectedNode.element) {
     selectedNode.element.classList.remove('selected');
   }
 
   selectedNode = node;
   if (node && node.element) {
     node.element.classList.add('selected');
+    console.log('✅ Node selected:', node.name, 'Element:', node.element);
   }
   
   showNodeProperties(node);
@@ -3320,17 +3354,23 @@ function selectNode(node) {
 function showNodeProperties(node) {
   const panel = document.getElementById('properties-panel');
   
+  if (!panel) {
+    console.error('Properties panel not found!');
+    return;
+  }
+  
   if (!node) {
     panel.innerHTML = '<div class="properties-empty">Select a node to edit its properties</div>';
     return;
   }
 
   console.log('📋 Showing properties for node:', node.name, node.type);
-
-  let html = `<div class="property-group node-header">
-    <h4>${node.name}</h4>
-    <div class="node-type-badge">${node.type}</div>
-  </div>`;
+  
+  try {
+    let html = `<div class="property-group node-header">
+      <h4>${node.name}</h4>
+      <div class="node-type-badge">${node.type}</div>
+    </div>`;
   
   // Get available source nodes for dropdowns (exclude self and nodes that would create cycles)
   const getAvailableSourceNodes = () => {
@@ -3561,6 +3601,12 @@ function showNodeProperties(node) {
   }
 
   panel.innerHTML = html;
+  
+  } catch (error) {
+    console.error('Error in showNodeProperties:', error);
+    panel.innerHTML = '<div class="properties-empty">Error loading node properties</div>';
+    return;
+  }
   
   // Start rendering previews
   if (node.category !== 'output') {
@@ -5158,9 +5204,9 @@ function updateMainOutputDropdown() {
     } else {
       // Connect selected node to Canvas
       const nodeId = parseInt(e.target.value);
-      const selectedNode = nodes.find(n => n.id === nodeId);
-      if (selectedNode) {
-        canvasDisplayNode.inputs[0] = selectedNode;
+      const nodeToConnect = nodes.find(n => n.id === nodeId);
+      if (nodeToConnect) {
+        canvasDisplayNode.inputs[0] = nodeToConnect;
       }
     }
     
