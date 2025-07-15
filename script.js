@@ -90,6 +90,16 @@ const PARAMETER_CONSTRAINTS = {
     values: ['rainbow', 'sunset', 'ocean', 'forest', 'fire', 'purple', 'monochrome'],
     default: 'rainbow'
   },
+  curve: {
+    type: 'string',
+    values: ['linear', 'exponential', 'logarithmic', 'sine', 'bounce'],
+    default: 'linear'
+  },
+  direction: {
+    type: 'string',
+    values: ['up', 'down'],
+    default: 'up'
+  },
   blendMode: { type: 'string', values: ['Normal', 'Multiply', 'Screen', 'Overlay'], default: 'Normal' },
   color: { type: 'color', default: '#ff0000' }
 };
@@ -694,6 +704,7 @@ const nodeDefinitions = {
   CursorInput: { inputs: [] },
   CameraInput: { inputs: [] },
   RandomInput: { inputs: [] },
+  RangeInput: { inputs: [] },
 
   // System
   Canvas: { inputs: [{ name: 'Input' }] }
@@ -989,6 +1000,20 @@ class SynthNode {
         icon: 'casino',
         category: 'input'
       },
+      RangeInput: {
+        inputs: [],
+        params: { 
+          min: 0.0, 
+          max: 1.0, 
+          step: 0.01, 
+          speed: 1.0,
+          curve: 'linear',
+          loop: true,
+          direction: 'up' // 'up' or 'down'
+        },
+        icon: 'timeline',
+        category: 'input'
+      },
       // System nodes
       FinalOutput: {
         inputs: [null], // Single input for the final result
@@ -1012,6 +1037,13 @@ class SynthNode {
         this.randomValue = Math.random();
         this.lastRandomUpdate = Date.now();
         this.currentValue = this.params.min + (this.randomValue * (this.params.max - this.params.min));
+      }
+      
+      // Initialize Range nodes
+      if (this.type === 'RangeInput') {
+        this.rangeProgress = 0; // 0 to 1 progress through the range
+        this.lastRangeUpdate = Date.now();
+        this.currentValue = this.params.min;
       }
     }
   }
@@ -2311,6 +2343,73 @@ function performAutoLayout() {
     updateConnections();
     fitGraphToView();
   }, 600);
+}
+
+/**
+ * Draw a preview of the curve function for Range nodes
+ */
+function drawCurvePreview(canvas, curveType) {
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+  
+  // Clear canvas
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(0, 0, width, height);
+  
+  // Draw grid
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, height/2);
+  ctx.lineTo(width, height/2);
+  ctx.moveTo(width/2, 0);
+  ctx.lineTo(width/2, height);
+  ctx.stroke();
+  
+  // Draw curve
+  ctx.strokeStyle = '#00ff88';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  
+  const steps = 100;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    let value = t;
+    
+    // Apply curve function
+    switch (curveType) {
+      case 'exponential':
+        value = Math.pow(t, 2);
+        break;
+      case 'logarithmic':
+        value = Math.log(t + 0.01) / Math.log(1.01);
+        break;
+      case 'sine':
+        value = (Math.sin((t - 0.5) * Math.PI) + 1) / 2;
+        break;
+      case 'bounce':
+        value = Math.abs(Math.sin(t * Math.PI * 2));
+        break;
+      // 'linear' is default
+    }
+    
+    const x = t * width;
+    const y = height - (value * height);
+    
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  
+  ctx.stroke();
+  
+  // Draw curve type label
+  ctx.fillStyle = '#888';
+  ctx.font = '10px Inter, sans-serif';
+  ctx.fillText(curveType, 4, 12);
 }
 
 /**
@@ -4158,6 +4257,17 @@ function showNodeProperties(node) {
       <div class="current-value-display">${displayValue}</div>
       <div class="help-text">Live random value (updates every ${node.params.interval} seconds)</div>
     </div>`;
+  } else if (node.type === 'RangeInput') {
+    // Calculate the current mapped value for display
+    const progress = node.rangeProgress || 0;
+    const mappedValue = node.params.min + (progress * (node.params.max - node.params.min));
+    const displayValue = mappedValue.toFixed(3);
+    const progressPercent = (progress * 100).toFixed(1);
+    html += `<div class="property-field">
+      <div class="property-label">Current Output</div>
+      <div class="current-value-display">${displayValue}</div>
+      <div class="help-text">Progress: ${progressPercent}% • ${node.params.loop ? 'Looping' : 'One-shot'}</div>
+    </div>`;
   }
 
     // Generate property controls based on node type
@@ -4207,6 +4317,11 @@ function showNodeProperties(node) {
           html += `<div class="color-palette-preview" data-palette="${value}">
             ${colorPalettes[value].map(color => `<div class="color-swatch" style="background-color: ${color}"></div>`).join('')}
           </div>`;
+        }
+        
+        // Add curve preview for RangeInput
+        if (node.type === 'RangeInput' && key === 'curve') {
+          html += `<canvas class="curve-preview" id="curve-preview-${node.id}" width="120" height="60" style="margin-top: 8px; border: 1px solid #333; border-radius: 4px; display: block;"></canvas>`;
         }
       } else {
         html += `<input type="text" class="property-input" data-param="${key}" id="${inputId}" value="${value}">`;
@@ -4291,6 +4406,14 @@ function showNodeProperties(node) {
   if (node.category !== 'output') {
     requestAnimationFrame(() => updateNodePreviews(node));
   }
+  
+  // Draw curve preview for RangeInput nodes
+  if (node.type === 'RangeInput') {
+    const canvas = document.getElementById(`curve-preview-${node.id}`);
+    if (canvas) {
+      drawCurvePreview(canvas, node.params.curve);
+    }
+  }
 
 
   // Add event listeners for property changes
@@ -4338,6 +4461,14 @@ function showNodeProperties(node) {
       // Debug logging for Layer blend mode changes
       if (node.type === 'Layer' && (param === 'blendMode' || param === 'opacity')) {
         Logger.info(`Layer ${node.name} ${param} changed to: ${validation.value}`);
+      }
+      
+      // Update curve preview for RangeInput
+      if (node.type === 'RangeInput' && param === 'curve') {
+        const canvas = document.getElementById(`curve-preview-${node.id}`);
+        if (canvas) {
+          drawCurvePreview(canvas, validation.value);
+        }
       }
 
       // Update input to show corrected value if it was changed
@@ -5217,14 +5348,66 @@ function updateInputNodeValue(node, time) {
 
       value = node.randomValue;
       break;
+      
+    case 'RangeInput':
+      // Update range progress based on speed and time
+      if (!node.rangeProgress) node.rangeProgress = 0;
+      if (!node.lastRangeUpdate) node.lastRangeUpdate = Date.now();
+      
+      const nowRange = Date.now();
+      const deltaTime = (nowRange - node.lastRangeUpdate) / 1000; // Convert to seconds
+      node.lastRangeUpdate = nowRange;
+      
+      // Calculate step progress
+      const range = node.params.max - node.params.min;
+      const steps = Math.abs(range / node.params.step);
+      const stepDuration = 1 / (node.params.speed * steps); // Time per step
+      
+      // Update progress
+      const progressDelta = deltaTime / stepDuration;
+      
+      if (node.params.direction === 'up') {
+        node.rangeProgress += progressDelta;
+      } else {
+        node.rangeProgress -= progressDelta;
+      }
+      
+      // Handle looping
+      if (node.params.loop) {
+        if (node.rangeProgress > 1) node.rangeProgress -= 1;
+        if (node.rangeProgress < 0) node.rangeProgress += 1;
+      } else {
+        node.rangeProgress = Math.max(0, Math.min(1, node.rangeProgress));
+      }
+      
+      // Apply curve function
+      let curvedProgress = node.rangeProgress;
+      switch (node.params.curve) {
+        case 'exponential':
+          curvedProgress = Math.pow(node.rangeProgress, 2);
+          break;
+        case 'logarithmic':
+          curvedProgress = Math.log(node.rangeProgress + 0.01) / Math.log(1.01);
+          break;
+        case 'sine':
+          curvedProgress = (Math.sin((node.rangeProgress - 0.5) * Math.PI) + 1) / 2;
+          break;
+        case 'bounce':
+          curvedProgress = Math.abs(Math.sin(node.rangeProgress * Math.PI * 2));
+          break;
+        // 'linear' is default
+      }
+      
+      value = curvedProgress;
+      break;
   }
 
   // Map value to node's min/max range
   const mappedValue = node.params.min + (value * (node.params.max - node.params.min));
   node.currentValue = mappedValue;
 
-  // Update the properties panel display if this node is selected and it's a RandomInput
-  if (node.type === 'RandomInput' && selectedNode === node) {
+  // Update the properties panel display if this node is selected and it's a RandomInput or RangeInput
+  if ((node.type === 'RandomInput' || node.type === 'RangeInput') && selectedNode === node) {
     const currentValueDisplay = document.querySelector('.current-value-display');
     if (currentValueDisplay) {
       currentValueDisplay.textContent = mappedValue.toFixed(3);
@@ -6680,7 +6863,7 @@ function updateExistingControlInputs() {
 function createControlInputNode(type) {
   try {
     // Validate type
-    const validTypes = ['MIDIInput', 'AudioInput', 'CursorInput', 'CameraInput', 'RandomInput'];
+    const validTypes = ['MIDIInput', 'AudioInput', 'CursorInput', 'CameraInput', 'RandomInput', 'RangeInput'];
     if (!validTypes.includes(type)) {
       throw new Error(`Invalid control input type: ${type}`);
     }
