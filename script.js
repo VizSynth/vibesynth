@@ -1650,10 +1650,14 @@ function compileShaders() {
       // Debug mode: show split view when blendMode is negative
       if (u_blendMode < -0.5) {
         // Split screen debug view
-        if (v_uv.x < 0.5) {
-          gl_FragColor = vec4(base.rgb, 1.0); // Left half: texture1
+        if (v_uv.x < 0.33) {
+          gl_FragColor = vec4(base.rgb, 1.0); // Left third: texture1
+        } else if (v_uv.x < 0.66) {
+          gl_FragColor = vec4(blend.rgb, 1.0); // Middle third: texture2
         } else {
-          gl_FragColor = vec4(blend.rgb, 1.0); // Right half: texture2
+          // Right third: difference to highlight issues
+          vec3 diff = abs(base.rgb - blend.rgb);
+          gl_FragColor = vec4(diff, 1.0);
         }
         return;
       }
@@ -4298,49 +4302,92 @@ function updateNodePreviews(node) {
  */
 function drawTextureToCanvas(texture, canvas) {
   const ctx = canvas.getContext('2d');
-  const width = canvas.width;
-  const height = canvas.height;
+  const canvasWidth = canvas.width;
+  const canvasHeight = canvas.height;
   
-  // Create a temporary framebuffer to read the texture
-  const fb = gl.createFramebuffer();
-  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+  // Save current WebGL state
+  const currentProgram = gl.getParameter(gl.CURRENT_PROGRAM);
+  const currentFramebuffer = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+  const currentViewport = gl.getParameter(gl.VIEWPORT);
   
-  if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE) {
-    // Read pixels from the framebuffer
-    const pixels = new Uint8Array(width * height * 4);
-    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+  try {
+    // Use the copy shader to render the texture
+    gl.useProgram(programs.copy);
     
-    // Create ImageData and draw to canvas
-    const imageData = ctx.createImageData(width, height);
+    // Create a temporary framebuffer
+    const tempFb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, tempFb);
     
-    // Flip vertically while copying (WebGL has Y axis flipped)
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const srcIndex = ((height - 1 - y) * width + x) * 4;
-        const dstIndex = (y * width + x) * 4;
-        imageData.data[dstIndex] = pixels[srcIndex];
-        imageData.data[dstIndex + 1] = pixels[srcIndex + 1];
-        imageData.data[dstIndex + 2] = pixels[srcIndex + 2];
-        imageData.data[dstIndex + 3] = pixels[srcIndex + 3];
+    // Create a temporary texture to render to
+    const tempTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tempTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvasWidth, canvasHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    
+    // Attach the texture to framebuffer
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tempTexture, 0);
+    
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE) {
+      // Set viewport to match preview size
+      gl.viewport(0, 0, canvasWidth, canvasHeight);
+      
+      // Bind the source texture
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      
+      // Set uniform
+      const texLoc = gl.getUniformLocation(programs.copy, 'u_texture');
+      gl.uniform1i(texLoc, 0);
+      
+      // Render the texture to our temporary framebuffer
+      bindQuad();
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      
+      // Read pixels from the temporary framebuffer
+      const pixels = new Uint8Array(canvasWidth * canvasHeight * 4);
+      gl.readPixels(0, 0, canvasWidth, canvasHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      
+      // Create ImageData and draw to canvas
+      const imageData = ctx.createImageData(canvasWidth, canvasHeight);
+      
+      // Flip vertically while copying (WebGL has Y axis flipped)
+      for (let y = 0; y < canvasHeight; y++) {
+        for (let x = 0; x < canvasWidth; x++) {
+          const srcIndex = ((canvasHeight - 1 - y) * canvasWidth + x) * 4;
+          const dstIndex = (y * canvasWidth + x) * 4;
+          imageData.data[dstIndex] = pixels[srcIndex];
+          imageData.data[dstIndex + 1] = pixels[srcIndex + 1];
+          imageData.data[dstIndex + 2] = pixels[srcIndex + 2];
+          imageData.data[dstIndex + 3] = pixels[srcIndex + 3];
+        }
       }
+      
+      ctx.putImageData(imageData, 0, 0);
     }
     
-    ctx.putImageData(imageData, 0, 0);
-  } else {
-    // Framebuffer incomplete - show error state
+    // Clean up temporary resources
+    gl.deleteTexture(tempTexture);
+    gl.deleteFramebuffer(tempFb);
+    
+  } catch (error) {
+    console.error('Error drawing texture to canvas:', error);
+    // Show error state
     ctx.fillStyle = '#440000';
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
     ctx.fillStyle = '#ff6666';
     ctx.font = '10px Inter';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Error', width/2, height/2);
+    ctx.fillText('Error', canvasWidth/2, canvasHeight/2);
+  } finally {
+    // Always restore WebGL state
+    gl.bindFramebuffer(gl.FRAMEBUFFER, currentFramebuffer);
+    gl.useProgram(currentProgram);
+    gl.viewport(currentViewport[0], currentViewport[1], currentViewport[2], currentViewport[3]);
   }
-  
-  // Clean up
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.deleteFramebuffer(fb);
 }
 
 /**
