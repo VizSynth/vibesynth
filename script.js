@@ -2294,16 +2294,14 @@ function calculateOptimalLayout(graph) {
         const getMinOutputPort = (nodeData) => {
           let minPort = Infinity;
           
-          nodeData.outputs.forEach(output => {
-            // Find which port this connects to on the target node
-            const targetData = graph.nodes.get(output.to);
-            if (targetData) {
-              targetData.inputs.forEach((input, idx) => {
-                if (input.from === nodeData.node.id) {
-                  minPort = Math.min(minPort, idx);
-                }
-              });
-            }
+          // Look through the actual node's outputs to find port connections
+          const actualNode = nodeData.node;
+          nodes.forEach(targetNode => {
+            targetNode.inputs.forEach((input, portIndex) => {
+              if (input && input.id === actualNode.id) {
+                minPort = Math.min(minPort, portIndex);
+              }
+            });
           });
           
           return minPort === Infinity ? 999 : minPort;
@@ -2331,6 +2329,8 @@ function calculateOptimalLayout(graph) {
         const aMinPort = getMinOutputPort(aData);
         const bMinPort = getMinOutputPort(bData);
         
+        Logger.debug(`Sorting ${aData.node.name} (port ${aMinPort}) vs ${bData.node.name} (port ${bMinPort})`);
+        
         if (aMinPort !== bMinPort) {
           return aMinPort - bMinPort;
         }
@@ -2349,16 +2349,16 @@ function calculateOptimalLayout(graph) {
           let minPort = Infinity;
           let minTargetId = Infinity;
           
-          nodeData.outputs.forEach(output => {
-            // Find which port this connects to on the target node
-            const targetData = graph.nodes.get(output.to);
-            if (targetData && !targetData.isCanvas) {
-              targetData.inputs.forEach((input, idx) => {
-                if (input.from === nodeData.node.id) {
+          // Look through actual nodes to find port connections
+          const actualNode = nodeData.node;
+          nodes.forEach(targetNode => {
+            if (targetNode.type !== 'FinalOutput' && targetNode.name !== 'Canvas') {
+              targetNode.inputs.forEach((input, portIndex) => {
+                if (input && input.id === actualNode.id) {
                   // Use port index as primary sort, target node ID as secondary
-                  if (idx < minPort || (idx === minPort && output.to < minTargetId)) {
-                    minPort = idx;
-                    minTargetId = output.to;
+                  if (portIndex < minPort || (portIndex === minPort && targetNode.id < minTargetId)) {
+                    minPort = portIndex;
+                    minTargetId = targetNode.id;
                   }
                 }
               });
