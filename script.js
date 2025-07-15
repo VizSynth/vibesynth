@@ -2351,28 +2351,29 @@ function calculateOptimalLayout(graph) {
   // Special handling for Canvas node
   const canvasNode = nodes.find(n => n.name === 'Canvas');
   if (canvasNode) {
-    // Position Canvas to the right and slightly below
+    // Find the rightmost and bottommost positions of all other nodes
     let maxX = 0;
-    let avgY = 0;
-    let count = 0;
+    let maxY = 0;
+    let rightmostNodeY = 0;
     
     positions.forEach((pos, id) => {
       if (id !== canvasNode.id) {
-        maxX = Math.max(maxX, pos.x);
-        avgY += pos.y;
-        count++;
+        if (pos.x >= maxX) {
+          maxX = pos.x;
+          rightmostNodeY = pos.y; // Y position of the rightmost node
+        }
+        maxY = Math.max(maxY, pos.y);
       }
     });
     
-    if (count > 0) {
-      avgY = avgY / count;
-    } else {
-      avgY = 200;
-    }
+    // Position Canvas to the right and below
+    // Use the Y position of the rightmost node plus offset to avoid overlap
+    const canvasX = maxX + 200; // Further right to avoid overlap
+    const canvasY = Math.max(rightmostNodeY + 150, maxY + 100); // Below rightmost or bottommost
     
     positions.set(canvasNode.id, {
-      x: maxX + 180,
-      y: avgY + 50
+      x: canvasX,
+      y: canvasY
     });
   }
   
