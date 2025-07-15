@@ -3696,9 +3696,6 @@ function showNodeProperties(node) {
       saveState(`Change control connection`);
     });
   });
-      }
-    });
-  });
 
   // Clear all mappings button
   panel.querySelectorAll('.remove-all-mappings').forEach(btn => {
