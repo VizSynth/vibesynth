@@ -903,6 +903,53 @@ html, body {
   font-size: 12px;
 }
 
+/* Visual Preview Section */
+.preview-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  padding: 12px;
+}
+
+.preview-inputs {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.preview-output {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+.preview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preview-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.preview-canvas {
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  display: block;
+}
+
+.preview-canvas.empty {
+  opacity: 0.5;
+}
+
 /* I/O Preview Section */
 .io-preview-section {
   background: var(--bg-secondary);

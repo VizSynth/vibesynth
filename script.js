@@ -615,6 +615,9 @@ let nodeCount = 0;
 let selectedNode = null;
 let mainOutputNode = null;
 
+// Debug mode for Layer nodes - set to true to see split view
+window.debugLayerSplit = false;
+
 /** Undo/Redo system */
 const undoStack = [];
 const redoStack = [];
@@ -1615,33 +1618,46 @@ function compileShaders() {
       vec4 base = texture2D(u_texture1, v_uv);
       vec4 blend = texture2D(u_texture2, v_uv);
       
+      // Debug mode: show split view when blendMode is negative
+      if (u_blendMode < -0.5) {
+        // Split screen debug view
+        if (v_uv.x < 0.5) {
+          gl_FragColor = vec4(base.rgb, 1.0); // Left half: texture1
+        } else {
+          gl_FragColor = vec4(blend.rgb, 1.0); // Right half: texture2
+        }
+        return;
+      }
+      
       vec3 result;
       float mode = u_blendMode;
       
       // Photoshop-style blend modes
+      vec3 blended;
+      
       if (mode < 0.5) {
-        // Normal: standard alpha blending
-        result = blend.rgb;
+        // Normal: standard alpha blending - just use the blend color
+        blended = blend.rgb;
       } else if (mode < 1.5) {
         // Multiply: darkens (base * blend)
-        result = base.rgb * blend.rgb;
+        blended = base.rgb * blend.rgb;
       } else if (mode < 2.5) {
         // Screen: lightens (inverse multiply)
-        result = vec3(1.0) - (vec3(1.0) - base.rgb) * (vec3(1.0) - blend.rgb);
+        blended = vec3(1.0) - (vec3(1.0) - base.rgb) * (vec3(1.0) - blend.rgb);
       } else if (mode < 3.5) {
         // Overlay: combines multiply and screen
         vec3 overlayed;
         overlayed.r = base.r < 0.5 ? (2.0 * base.r * blend.r) : (1.0 - 2.0 * (1.0 - base.r) * (1.0 - blend.r));
         overlayed.g = base.g < 0.5 ? (2.0 * base.g * blend.g) : (1.0 - 2.0 * (1.0 - base.g) * (1.0 - blend.g));
         overlayed.b = base.b < 0.5 ? (2.0 * base.b * blend.b) : (1.0 - 2.0 * (1.0 - base.b) * (1.0 - blend.b));
-        result = overlayed;
+        blended = overlayed;
       } else {
         // Fallback to normal
-        result = blend.rgb;
+        blended = blend.rgb;
       }
       
-      // Apply opacity blending with base
-      result = mix(base.rgb, result, u_opacity);
+      // Apply opacity to blend between base and blended result
+      vec3 result = mix(base.rgb, blended, u_opacity);
       
       gl_FragColor = vec4(result, 1.0);
     }
@@ -3485,7 +3501,44 @@ function showNodeProperties(node) {
     html += `</div>`;
   }
   
-  // 4. Output Connections Section (show what nodes use this as input)
+  // 4. Visual Preview Section (show input/output previews)
+  if (node.category !== 'output') {
+    html += `<div class="property-group">
+      <h5><span class="section-icon">👁️</span> Visual Preview</h5>
+      <div class="preview-container">`;
+    
+    // Input previews
+    if (nodeDefinition && nodeDefinition.inputs && nodeDefinition.inputs.length > 0) {
+      html += `<div class="preview-inputs">`;
+      nodeDefinition.inputs.forEach((inputDef, index) => {
+        const hasInput = node.inputs[index] && node.inputs[index].texture;
+        html += `<div class="preview-item">
+          <div class="preview-label">${inputDef.name}</div>
+          <canvas class="preview-canvas ${hasInput ? '' : 'empty'}" 
+                  data-preview-type="input" 
+                  data-input-index="${index}"
+                  width="80" height="60">
+          </canvas>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+    
+    // Output preview
+    html += `<div class="preview-output">
+      <div class="preview-item">
+        <div class="preview-label">Output</div>
+        <canvas class="preview-canvas" 
+                data-preview-type="output"
+                width="120" height="90">
+        </canvas>
+      </div>
+    </div>`;
+    
+    html += `</div></div>`;
+  }
+  
+  // 5. Output Connections Section (show what nodes use this as input)
   const outputConnections = nodes.filter(n => n.inputs.includes(node));
   if (outputConnections.length > 0) {
     html += `<div class="property-group">
@@ -3508,6 +3561,11 @@ function showNodeProperties(node) {
   }
 
   panel.innerHTML = html;
+  
+  // Start rendering previews
+  if (node.category !== 'output') {
+    requestAnimationFrame(() => updateNodePreviews(node));
+  }
 
 
   // Add event listeners for property changes
@@ -4171,6 +4229,99 @@ function updateControlMappingDisplay(node) {
 }
 
 /**
+ * Update preview canvases in the properties panel
+ */
+function updateNodePreviews(node) {
+  if (!node || selectedNode !== node) return;
+  
+  const panel = document.getElementById('properties-panel');
+  if (!panel) return;
+  
+  // Update input previews
+  const inputCanvases = panel.querySelectorAll('[data-preview-type="input"]');
+  inputCanvases.forEach(canvas => {
+    const ctx = canvas.getContext('2d');
+    const inputIndex = parseInt(canvas.dataset.inputIndex);
+    const inputNode = node.inputs[inputIndex];
+    
+    if (inputNode && inputNode.texture && gl.isTexture(inputNode.texture)) {
+      // Draw the input texture
+      drawTextureToCanvas(inputNode.texture, canvas);
+    } else {
+      // Clear canvas for empty input
+      ctx.fillStyle = '#2a2a2a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#666';
+      ctx.font = '10px Inter';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('No Input', canvas.width/2, canvas.height/2);
+    }
+  });
+  
+  // Update output preview
+  const outputCanvas = panel.querySelector('[data-preview-type="output"]');
+  if (outputCanvas && node.texture && gl.isTexture(node.texture)) {
+    drawTextureToCanvas(node.texture, outputCanvas);
+  }
+  
+  // Continue updating if node is still selected
+  if (selectedNode === node) {
+    requestAnimationFrame(() => updateNodePreviews(node));
+  }
+}
+
+/**
+ * Draw a WebGL texture to a 2D canvas
+ */
+function drawTextureToCanvas(texture, canvas) {
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+  
+  // Create a temporary framebuffer to read the texture
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+  
+  if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE) {
+    // Read pixels from the framebuffer
+    const pixels = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    
+    // Create ImageData and draw to canvas
+    const imageData = ctx.createImageData(width, height);
+    
+    // Flip vertically while copying (WebGL has Y axis flipped)
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const srcIndex = ((height - 1 - y) * width + x) * 4;
+        const dstIndex = (y * width + x) * 4;
+        imageData.data[dstIndex] = pixels[srcIndex];
+        imageData.data[dstIndex + 1] = pixels[srcIndex + 1];
+        imageData.data[dstIndex + 2] = pixels[srcIndex + 2];
+        imageData.data[dstIndex + 3] = pixels[srcIndex + 3];
+      }
+    }
+    
+    ctx.putImageData(imageData, 0, 0);
+  } else {
+    // Framebuffer incomplete - show error state
+    ctx.fillStyle = '#440000';
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = '#ff6666';
+    ctx.font = '10px Inter';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Error', width/2, height/2);
+  }
+  
+  // Clean up
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.deleteFramebuffer(fb);
+}
+
+/**
  * Update node properties UI (for refreshing during control input)
  */
 function updateNodeProperties(node) {
@@ -4776,7 +4927,14 @@ function setNodeUniforms(node) {
         gl.uniform3f(loc, r, g, b);
       } else if (key === 'blendMode') {
         const modes = { 'Normal': 0, 'Multiply': 1, 'Screen': 2, 'Overlay': 3 };
-        const modeValue = modes[value] || 0;
+        let modeValue = modes[value] || 0;
+        
+        // Check for debug mode
+        if (window.debugLayerSplit && node.type === 'Layer') {
+          modeValue = -1; // This triggers split view in shader
+          console.log(`🔍 Layer ${node.name} in DEBUG SPLIT VIEW mode`);
+        }
+        
         console.log(`🎨 Setting blend mode for ${node.name}: "${value}" -> ${modeValue}, loc:`, loc);
         if (loc !== null && loc !== -1) {
           gl.uniform1f(loc, parseFloat(modeValue));
@@ -4908,6 +5066,13 @@ function setNodeUniforms(node) {
         // Debug logging for Layer nodes
         if (node.type === 'Layer') {
           console.log(`🔗 Layer ${node.name} binding: Input ${index} (${inputNode.name}) -> ${uniformName} on texture unit ${index}`);
+          
+          // Verify the uniform location was found
+          if (!loc || loc === -1) {
+            console.error(`❌ Layer ${node.name}: Could not find uniform location for ${uniformName}`);
+          } else {
+            console.log(`✅ Layer ${node.name}: Successfully bound ${inputNode.name} to ${uniformName}`);
+          }
         }
         
         // Verify texture binding succeeded
