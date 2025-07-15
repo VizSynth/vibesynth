@@ -5003,6 +5003,15 @@ function bindNodeInputTextures(node) {
   if (node.type === 'Layer') {
     console.log(`🎯 Layer ${node.name} has ${node.inputs.length} inputs:`, 
       node.inputs.map((inp, i) => inp ? `${i}: ${inp.name}` : `${i}: empty`));
+    
+    // Verify both inputs have valid textures
+    node.inputs.forEach((inp, i) => {
+      if (inp && inp.texture) {
+        console.log(`   Input ${i} (${inp.name}): texture=${inp.texture}, valid=${gl.isTexture(inp.texture)}`);
+      } else {
+        console.log(`   Input ${i}: NO TEXTURE`);
+      }
+    });
   }
 
   // Set input textures
@@ -5043,21 +5052,25 @@ function bindNodeInputTextures(node) {
       const isMultiInputNode = node.type === 'Mix' || node.type === 'Layer' || node.type === 'Composite';
       const uniformName = isMultiInputNode ? `u_texture${index + 1}` : (index === 0 ? "u_texture" : `u_texture${index + 1}`);
       const loc = gl.getUniformLocation(node.program, uniformName);
-      if (loc) {
-        gl.activeTexture(gl.TEXTURE0 + index);
+      if (loc !== null && loc !== -1) {
+        // For Layer/Mix/Composite nodes, texture unit should match the uniform number
+        const textureUnit = isMultiInputNode ? index : index;
+        gl.activeTexture(gl.TEXTURE0 + textureUnit);
         gl.bindTexture(gl.TEXTURE_2D, inputNode.texture);
-        gl.uniform1i(loc, index);
+        gl.uniform1i(loc, textureUnit);
         
         // Debug logging for Layer nodes
         if (node.type === 'Layer') {
-          console.log(`🔗 Layer ${node.name} binding: Input ${index} (${inputNode.name}) -> ${uniformName} on texture unit ${index}`);
+          console.log(`🔗 Layer ${node.name} binding: Input ${index} (${inputNode.name}) -> ${uniformName} on texture unit ${textureUnit}, uniform location: ${loc}`);
           
-          // Verify the uniform location was found
-          if (!loc || loc === -1) {
-            console.error(`❌ Layer ${node.name}: Could not find uniform location for ${uniformName}`);
-          } else {
-            console.log(`✅ Layer ${node.name}: Successfully bound ${inputNode.name} to ${uniformName}`);
-          }
+          // Test if we can read back the uniform value
+          const testVal = gl.getUniform(node.program, loc);
+          console.log(`   Uniform ${uniformName} value after setting: ${testVal}`);
+          
+          // Verify texture is bound
+          gl.activeTexture(gl.TEXTURE0 + textureUnit);
+          const boundTexture = gl.getParameter(gl.TEXTURE_BINDING_2D);
+          console.log(`   Texture unit ${textureUnit} has texture: ${boundTexture === inputNode.texture ? '✅ Correct' : '❌ Wrong'} (${boundTexture})`);
         }
         
         // Verify texture binding succeeded
