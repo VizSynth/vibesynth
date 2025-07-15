@@ -1,113 +1,131 @@
-# Known Issues
+# Known Issues - Web Visual Synthesizer
 
-## 2025-07-14 - Layer Blend Modes
+## Critical Issues
 
-**Issue**: Layer node blend modes change the output but don't produce correct Photoshop-style blending effects
-**Status**: Partially fixed - blend mode value reaches shader but visual results incorrect
-**Details**:
-- Debug color bars change correctly (red/green/blue/yellow)
-- Blend mode uniform is being set correctly
-- Output changes between modes but doesn't match expected behavior
-- Multiply should be darker, Screen should be brighter
-**Next Steps**: 
-- Verify both input textures are different
-- Check if textures are binding to correct units
-- Test with simplified shader to isolate issue & Bug Tracker
+### 1. Layer Node Texture Binding Failure
+**Status**: 🔴 CRITICAL  
+**Description**: Layer nodes are not properly reading from both input textures. The debug split view shows the same content on both sides.
 
-This file tracks known bugs, errors, and issues that need to be addressed in the visual synthesizer application.
+**Symptoms**:
+- Debug split view (when `window.debugLayerSplit = true`) shows identical content on left and right
+- Console shows texture binding attempts but uniforms receive incorrect values
+- Blend modes have no effect because only one texture is being read
 
----
+**Root Cause Analysis**:
+- Uniform values show 0 for both u_texture1 and u_texture2
+- Texture binding verification shows textures are bound but shader isn't reading them
+- Possible issue with texture unit assignment or shader uniform binding
 
-## 🔴 Critical Issues
+### 2. Input/Output Preview Canvases Not Rendering
+**Status**: 🔴 CRITICAL  
+**Description**: The preview canvases in the node properties panel remain blank/black.
 
-### 1. **Update Check Fetch Error**
-**Error**: `script.js?v=1.6:4869 Failed to check HTML: TypeError: Failed to fetch`
-**Location**: `checkForUpdates()` function at line 4847:32
-**Stack Trace**: 
-```
-Failed to fetch
-    at checkForUpdates (script.js?v=1.6:4847:32)
-checkForUpdates @ script.js?v=1.6:4869
-```
-**Impact**: Update checking functionality is broken
-**Status**: **NEEDS INVESTIGATION**
-**Priority**: Medium
+**Symptoms**:
+- Input preview canvases show "No Input" even when inputs are connected
+- Output preview canvas remains black
+- No WebGL errors in console related to preview rendering
 
-**Analysis Needed**:
-- Determine what URL is being fetched
-- Check if it's a CORS issue or network connectivity
-- Verify if the update check is essential or can be disabled
-- Consider fallback handling for fetch failures
+**Root Cause Analysis**:
+- `drawTextureToCanvas()` function may have framebuffer issues
+- Possible timing issue with preview updates
+- Canvas context or WebGL state conflicts
 
----
+### 3. WebGL Texture Validation Errors
+**Status**: 🟡 MODERATE  
+**Description**: Multiple WebGL errors related to texture operations.
 
-## 🔴 Critical Issues
+**Symptoms**:
+- "Error getting texture parameters" warnings
+- Invalid enum errors (1280) when validating textures
+- Fallback textures being created unnecessarily
 
-*No issues currently tracked*
+**Root Cause Analysis**:
+- Removed problematic `gl.getTexParameter()` calls but issues persist
+- Texture state validation happening at wrong times
+- Possible texture deletion/recreation timing issues
 
----
+## Non-Critical Issues
 
-## 🟡 Medium Priority Issues
+### 4. Control Input Connections Not Working
+**Status**: 🟡 MODERATE  
+**Description**: The new unified connection UI for control inputs may not be properly connecting control nodes.
 
-*No issues currently tracked*
+**Symptoms**:
+- Control input dropdowns show available nodes but connections may not update parameters
+- No visual feedback for active control connections
 
----
+### 5. Debug Console Spam
+**Status**: 🟢 MINOR  
+**Description**: Excessive console logging making it hard to diagnose issues.
 
-## 🟢 Low Priority Issues
+**Symptoms**:
+- Repeated texture binding logs
+- Uniform value logs showing incorrect values
+- Makes it difficult to spot actual errors
 
-*No issues currently tracked*
+## Fix Priority Plan
 
----
+### Phase 1: Fix Layer Texture Binding (CRITICAL)
+1. **Diagnose why uniforms show value 0**
+   - Check if shader program is active when setting uniforms
+   - Verify texture unit integers are being passed correctly
+   - Test with hardcoded texture units
 
-## ✅ Resolved Issues
+2. **Rewrite texture binding logic**
+   - Separate texture setup from uniform setting
+   - Ensure proper GL state management
+   - Add texture unit state tracking
 
-### 3. **WebGL Invalid Operation - Using Deleted Objects** [FIXED]
-**Original Error**: `WebGL: INVALID_OPERATION: bindFramebuffer: attempt to use a deleted object`
-**Root Cause**: Aggressive resource management system was causing WebGL crashes that didn't exist before the "robustness" improvements
-**Solution**:
-- Completely removed aggressive resource tracking and cleanup system
-- Simplified node deletion to use basic, reliable WebGL cleanup
-- Removed automatic orphaned resource cleanup that ran every 5 minutes
-- Returned to simple, direct resource management without complex tracking
-- Kept essential validity checks without being overly aggressive
-**Fixed in**: script.js v2.3
-**Impact**: Eliminated WebGL crashes by removing the problematic resource management system that was causing issues that never existed before
+3. **Verify shader compilation**
+   - Check if Layer shader has all uniforms defined
+   - Test with simplified shader first
 
-### 2. **Connection Lines Misaligned During Zoom/Pan** [FIXED - PERMANENT]
-**Original Error**: Connection lines between nodes drawn in wrong positions when graph is zoomed or panned
-**Root Cause**: Coordinate system mismatch - port positions were calculated relative to the transformed nodes-container, but SVG uses screen coordinates
-**Solution**: 
-- Fixed all port calculation functions (`getInputPorts()`, `getOutputPort()`) to use SVG coordinates directly
-- Updated control port connection logic to use consistent coordinate system
-- Fixed drag connection logic to use SVG-relative coordinates
-- All connections now use absolute screen coordinates relative to the SVG element
-**Fixed in**: script.js v2.4 (permanent fix)
-**Impact**: Connection lines now permanently align with node ports during all zoom/pan operations
+### Phase 2: Fix Preview System (CRITICAL)
+1. **Debug drawTextureToCanvas function**
+   - Add error checking for framebuffer operations
+   - Verify canvas contexts are valid
+   - Check for GL state conflicts
 
-### 1. **Update Check Fetch Error** [FIXED]
-**Original Error**: `script.js?v=1.6:4869 Failed to check HTML: TypeError: Failed to fetch`
-**Root Cause**: The `checkForUpdates()` function was trying to fetch local files using the fetch API, which browsers block when running from `file://` protocol for security reasons
-**Solution**: 
-- Added protocol check to skip update checking when running from `file://` 
-- Improved error handling to suppress fetch-related console spam
-- Added documentation explaining HTTP/HTTPS requirement
-**Fixed in**: script.js v1.7
-**Impact**: Eliminated console errors, cleaner development experience
+2. **Implement robust preview pipeline**
+   - Use separate framebuffers for previews
+   - Add proper error recovery
+   - Implement fallback rendering
 
----
+### Phase 3: Clean Up WebGL Errors (MODERATE)
+1. **Remove unnecessary texture validation**
+   - Only validate textures when absolutely necessary
+   - Trust WebGL state after successful operations
 
-## 📋 Investigation Guidelines
+2. **Implement proper error boundaries**
+   - Catch and handle specific WebGL errors
+   - Provide meaningful fallbacks
 
-When investigating issues:
-1. **Reproduce**: Can the issue be consistently reproduced?
-2. **Isolate**: What specific conditions trigger the issue?
-3. **Impact**: How does this affect user experience?
-4. **Root Cause**: What's the underlying technical cause?
-5. **Fix Strategy**: What's the safest way to resolve it?
-6. **Testing**: How can we verify the fix works?
+### Phase 4: Verify Control System (MODERATE)
+1. **Test control input connections**
+   - Verify parameter updates from control nodes
+   - Add visual indicators for active connections
 
----
+### Phase 5: Reduce Debug Noise (MINOR)
+1. **Implement debug levels**
+   - Add toggleable debug categories
+   - Reduce repetitive logging
+   - Keep only essential error messages
 
-*Last Updated: 2024-12-XX*
-*Issues to investigate: 0*
-*Issues resolved: 3*
+## Testing Protocol
+
+After each fix:
+1. Test Layer node with two different inputs
+2. Verify preview canvases update in real-time
+3. Check console for WebGL errors
+4. Test all blend modes
+5. Verify control inputs update parameters
+6. Run full node graph with multiple connections
+
+## Success Criteria
+
+- Layer nodes properly blend two different input textures
+- All blend modes produce visually distinct results
+- Preview canvases show real-time texture content
+- No WebGL errors in console during normal operation
+- Control inputs successfully modulate parameters
+- Console output is clean and informative

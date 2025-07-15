@@ -616,7 +616,7 @@ let selectedNode = null;
 let mainOutputNode = null;
 
 // Debug mode for Layer nodes - set to true to see split view
-window.debugLayerSplit = true;
+window.debugLayerSplit = false;
 
 /** Undo/Redo system */
 const undoStack = [];
@@ -4999,19 +4999,10 @@ function setNodeUniforms(node) {
  * Bind input textures for a node
  */
 function bindNodeInputTextures(node) {
-  // Debug Layer inputs before binding
-  if (node.type === 'Layer') {
-    console.log(`🎯 Layer ${node.name} has ${node.inputs.length} inputs:`, 
-      node.inputs.map((inp, i) => inp ? `${i}: ${inp.name}` : `${i}: empty`));
-    
-    // Verify both inputs have valid textures
-    node.inputs.forEach((inp, i) => {
-      if (inp && inp.texture) {
-        console.log(`   Input ${i} (${inp.name}): texture=${inp.texture}, valid=${gl.isTexture(inp.texture)}`);
-      } else {
-        console.log(`   Input ${i}: NO TEXTURE`);
-      }
-    });
+  // Minimal debug for Layer inputs
+  if (node.type === 'Layer' && window.debugLayerTextures) {
+    console.log(`Layer ${node.name} inputs:`, 
+      node.inputs.map((inp, i) => inp ? inp.name : 'empty'));
   }
 
   // Set input textures
@@ -5053,24 +5044,19 @@ function bindNodeInputTextures(node) {
       const uniformName = isMultiInputNode ? `u_texture${index + 1}` : (index === 0 ? "u_texture" : `u_texture${index + 1}`);
       const loc = gl.getUniformLocation(node.program, uniformName);
       if (loc !== null && loc !== -1) {
-        // For Layer/Mix/Composite nodes, texture unit should match the uniform number
-        const textureUnit = isMultiInputNode ? index : index;
+        // CRITICAL FIX: For texture samplers, the uniform value should be the texture unit INDEX
+        // not the actual GL constant. u_texture1 should get value 0, u_texture2 should get value 1
+        const textureUnit = index; // This is 0 for first input, 1 for second input
         gl.activeTexture(gl.TEXTURE0 + textureUnit);
         gl.bindTexture(gl.TEXTURE_2D, inputNode.texture);
+        
+        // Set the sampler uniform to the texture unit index
         gl.uniform1i(loc, textureUnit);
         
-        // Debug logging for Layer nodes
-        if (node.type === 'Layer') {
-          console.log(`🔗 Layer ${node.name} binding: Input ${index} (${inputNode.name}) -> ${uniformName} on texture unit ${textureUnit}, uniform location: ${loc}`);
-          
-          // Test if we can read back the uniform value
+        // Minimal debug logging for Layer nodes
+        if (node.type === 'Layer' && window.debugLayerTextures) {
           const testVal = gl.getUniform(node.program, loc);
-          console.log(`   Uniform ${uniformName} value after setting: ${testVal}`);
-          
-          // Verify texture is bound
-          gl.activeTexture(gl.TEXTURE0 + textureUnit);
-          const boundTexture = gl.getParameter(gl.TEXTURE_BINDING_2D);
-          console.log(`   Texture unit ${textureUnit} has texture: ${boundTexture === inputNode.texture ? '✅ Correct' : '❌ Wrong'} (${boundTexture})`);
+          console.log(`Layer ${uniformName}: unit=${textureUnit}, value=${testVal}`);
         }
         
         // Verify texture binding succeeded
