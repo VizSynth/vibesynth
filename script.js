@@ -2146,6 +2146,12 @@ function performAutoLayout() {
   // Calculate optimal positions to minimize crossings
   const positions = calculateOptimalLayout(nodeGraph);
   
+  // Log initial layout info
+  Logger.debug('Initial layout calculated:', {
+    nodeCount: positions.size,
+    layers: Array.from(new Set(Array.from(positions.values()).map(p => p.x))).length
+  });
+  
   // Further optimize to reduce crossings
   optimizeLayoutCrossings(nodeGraph, positions);
   
@@ -2278,19 +2284,38 @@ function calculateOptimalLayout(graph) {
   layers.forEach((layerNodes, depth) => {
     // Sort nodes in this layer based on their connections to previous layer
     if (depth > 0) {
-      // Use barycenter method for crossing minimization
+      // Sort nodes based on which nodes they connect TO
+      // This ensures proper alignment with downstream nodes
       layerNodes.sort((a, b) => {
         const aData = graph.nodes.get(a);
         const bData = graph.nodes.get(b);
         
-        // Calculate barycenter (average position) of connected nodes
+        // Find the minimum port index each node connects to
+        const getMinOutputPort = (nodeData) => {
+          let minPort = Infinity;
+          
+          nodeData.outputs.forEach(output => {
+            // Find which port this connects to on the target node
+            const targetData = graph.nodes.get(output.to);
+            if (targetData) {
+              targetData.inputs.forEach((input, idx) => {
+                if (input.from === nodeData.node.id) {
+                  minPort = Math.min(minPort, idx);
+                }
+              });
+            }
+          });
+          
+          return minPort === Infinity ? 999 : minPort;
+        };
+        
+        // Also check input connections for secondary sorting
         const getBarycenter = (nodeData) => {
-          if (nodeData.inputs.length === 0) return Infinity; // Nodes with no inputs go to bottom
+          if (nodeData.inputs.length === 0) return 999;
           
           let totalY = 0;
           let count = 0;
           
-          // Simple average of input positions
           nodeData.inputs.forEach(input => {
             const inputPos = positions.get(input.from);
             if (inputPos) {
@@ -2299,48 +2324,65 @@ function calculateOptimalLayout(graph) {
             }
           });
           
-          return count > 0 ? totalY / count : Infinity;
+          return count > 0 ? totalY / count : 999;
         };
         
-        const aBarycenter = getBarycenter(aData);
-        const bBarycenter = getBarycenter(bData);
+        // First sort by which port they connect to (top ports first)
+        const aMinPort = getMinOutputPort(aData);
+        const bMinPort = getMinOutputPort(bData);
         
-        // If barycenters are equal, maintain relative order based on outputs
-        if (Math.abs(aBarycenter - bBarycenter) < 0.001) {
-          // Nodes with more outputs should be positioned more centrally
-          return bData.outputs.length - aData.outputs.length;
+        if (aMinPort !== bMinPort) {
+          return aMinPort - bMinPort;
         }
         
-        return aBarycenter - bBarycenter;
+        // Then by input positions
+        return getBarycenter(aData) - getBarycenter(bData);
       });
     } else {
-      // For the first layer, sort by output connections to minimize initial crossings
+      // For the first layer, sort by which ports they connect to
       layerNodes.sort((a, b) => {
         const aData = graph.nodes.get(a);
         const bData = graph.nodes.get(b);
         
-        // Calculate average Y position of nodes this connects to
-        const getAvgOutputY = (nodeData) => {
-          if (nodeData.outputs.length === 0) return Infinity;
+        // Find the minimum port index each node connects to
+        const getMinOutputPort = (nodeData) => {
+          let minPort = Infinity;
+          let minTargetId = Infinity;
           
-          let totalY = 0;
-          let count = 0;
-          
-          // Look ahead to where this node connects
           nodeData.outputs.forEach(output => {
+            // Find which port this connects to on the target node
             const targetData = graph.nodes.get(output.to);
-            if (targetData && targetData.depth > nodeData.depth) {
-              // Estimate Y position based on node index
-              const targetIndex = nodes.findIndex(n => n.id === output.to);
-              totalY += targetIndex * 120; // Approximate Y spacing
-              count++;
+            if (targetData && !targetData.isCanvas) {
+              targetData.inputs.forEach((input, idx) => {
+                if (input.from === nodeData.node.id) {
+                  // Use port index as primary sort, target node ID as secondary
+                  if (idx < minPort || (idx === minPort && output.to < minTargetId)) {
+                    minPort = idx;
+                    minTargetId = output.to;
+                  }
+                }
+              });
             }
           });
           
-          return count > 0 ? totalY / count : Infinity;
+          return { port: minPort === Infinity ? 999 : minPort, targetId: minTargetId };
         };
         
-        return getAvgOutputY(aData) - getAvgOutputY(bData);
+        const aOutput = getMinOutputPort(aData);
+        const bOutput = getMinOutputPort(bData);
+        
+        // Sort by port index first
+        if (aOutput.port !== bOutput.port) {
+          return aOutput.port - bOutput.port;
+        }
+        
+        // Then by target node ID if connecting to same port
+        if (aOutput.targetId !== bOutput.targetId) {
+          return aOutput.targetId - bOutput.targetId;
+        }
+        
+        // Finally by node type for consistency
+        return aData.node.type.localeCompare(bData.node.type);
       });
     }
     
