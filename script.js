@@ -2140,6 +2140,373 @@ function performAutoLayout() {
   // Show visual feedback that auto-layout is active
   showAutoLayoutFeedback();
 
+  // Build a graph representation for smarter layout
+  const nodeGraph = buildNodeGraph();
+  
+  // Calculate optimal positions to minimize crossings
+  const positions = calculateOptimalLayout(nodeGraph);
+  
+  // Further optimize to reduce crossings
+  optimizeLayoutCrossings(nodeGraph, positions);
+  
+  // Apply the calculated positions
+  applyLayoutPositions(positions);
+}
+
+/**
+ * Build a graph representation of nodes and their connections
+ */
+function buildNodeGraph() {
+  const graph = {
+    nodes: new Map(),
+    edges: []
+  };
+  
+  // Initialize node data
+  nodes.forEach(node => {
+    graph.nodes.set(node.id, {
+      node: node,
+      inputs: [],
+      outputs: [],
+      depth: -1,
+      position: null
+    });
+  });
+  
+  // Build connection data
+  nodes.forEach(node => {
+    const nodeData = graph.nodes.get(node.id);
+    
+    // Track inputs
+    node.inputs.forEach((input, index) => {
+      if (input) {
+        nodeData.inputs.push({ from: input.id, toPort: index });
+        const inputData = graph.nodes.get(input.id);
+        if (inputData) {
+          inputData.outputs.push({ to: node.id, fromPort: 0 });
+        }
+        graph.edges.push({ from: input.id, to: node.id });
+      }
+    });
+    
+    // Track control inputs
+    if (node.controlInputs) {
+      node.controlInputs.forEach((input, index) => {
+        if (input) {
+          nodeData.inputs.push({ from: input.id, toPort: index + node.inputs.length, isControl: true });
+          const inputData = graph.nodes.get(input.id);
+          if (inputData) {
+            inputData.outputs.push({ to: node.id, fromPort: 0, isControl: true });
+          }
+          graph.edges.push({ from: input.id, to: node.id, isControl: true });
+        }
+      });
+    }
+  });
+  
+  // Calculate depth (distance from source nodes)
+  calculateNodeDepths(graph);
+  
+  return graph;
+}
+
+/**
+ * Calculate depth of each node in the graph
+ */
+function calculateNodeDepths(graph) {
+  // Find source nodes (no inputs)
+  const sources = [];
+  graph.nodes.forEach((data, id) => {
+    if (data.inputs.length === 0) {
+      data.depth = 0;
+      sources.push(id);
+    }
+  });
+  
+  // BFS to calculate depths
+  const queue = [...sources];
+  while (queue.length > 0) {
+    const nodeId = queue.shift();
+    const nodeData = graph.nodes.get(nodeId);
+    
+    nodeData.outputs.forEach(output => {
+      const targetData = graph.nodes.get(output.to);
+      if (targetData.depth === -1 || targetData.depth > nodeData.depth + 1) {
+        targetData.depth = nodeData.depth + 1;
+        queue.push(output.to);
+      }
+    });
+  }
+  
+  // Handle disconnected nodes
+  graph.nodes.forEach((data, id) => {
+    if (data.depth === -1) {
+      data.depth = 0;
+    }
+  });
+}
+
+/**
+ * Calculate optimal layout positions to minimize crossings
+ */
+function calculateOptimalLayout(graph) {
+  const positions = new Map();
+  
+  // Group nodes by depth
+  const layers = new Map();
+  graph.nodes.forEach((data, id) => {
+    if (!layers.has(data.depth)) {
+      layers.set(data.depth, []);
+    }
+    layers.get(data.depth).push(id);
+  });
+  
+  // Position nodes layer by layer
+  const layerX = new Map();
+  const baseX = 50;
+  const xSpacing = 200;
+  
+  // Calculate X positions for each layer
+  for (let depth = 0; depth <= Math.max(...layers.keys()); depth++) {
+    layerX.set(depth, baseX + (depth * xSpacing));
+  }
+  
+  // Position nodes within each layer to minimize crossings
+  layers.forEach((layerNodes, depth) => {
+    // Sort nodes in this layer based on their connections to previous layer
+    if (depth > 0) {
+      // Use barycenter method for crossing minimization
+      layerNodes.sort((a, b) => {
+        const aData = graph.nodes.get(a);
+        const bData = graph.nodes.get(b);
+        
+        // Calculate barycenter (average position) of connected nodes
+        const getBarycenter = (nodeData) => {
+          if (nodeData.inputs.length === 0) return 0;
+          
+          let totalY = 0;
+          let totalWeight = 0;
+          
+          nodeData.inputs.forEach((input, idx) => {
+            const inputPos = positions.get(input.from);
+            if (inputPos) {
+              // Weight connections by their port index to maintain order
+              const weight = 1.0 / (idx + 1);
+              totalY += inputPos.y * weight;
+              totalWeight += weight;
+            }
+          });
+          
+          return totalWeight > 0 ? totalY / totalWeight : 0;
+        };
+        
+        const aBarycenter = getBarycenter(aData);
+        const bBarycenter = getBarycenter(bData);
+        
+        // If barycenters are equal, maintain relative order based on outputs
+        if (Math.abs(aBarycenter - bBarycenter) < 0.001) {
+          // Nodes with more outputs should be positioned more centrally
+          return bData.outputs.length - aData.outputs.length;
+        }
+        
+        return aBarycenter - bBarycenter;
+      });
+    } else {
+      // For the first layer, sort by number of outputs and type
+      layerNodes.sort((a, b) => {
+        const aData = graph.nodes.get(a);
+        const bData = graph.nodes.get(b);
+        const aNode = aData.node;
+        const bNode = bData.node;
+        
+        // Group by category first
+        if (aNode.category !== bNode.category) {
+          const categoryOrder = ['input', 'source', 'effect', 'compositing', 'system'];
+          return categoryOrder.indexOf(aNode.category) - categoryOrder.indexOf(bNode.category);
+        }
+        
+        // Within category, sort by output count
+        return bData.outputs.length - aData.outputs.length;
+      });
+    }
+    
+    // Assign Y positions within the layer
+    const ySpacing = 120;
+    const startY = 80;
+    
+    // Check if we need multiple columns for this layer
+    const maxNodesPerColumn = 5;
+    const columns = Math.ceil(layerNodes.length / maxNodesPerColumn);
+    
+    layerNodes.forEach((nodeId, index) => {
+      const column = Math.floor(index / maxNodesPerColumn);
+      const rowInColumn = index % maxNodesPerColumn;
+      
+      const x = layerX.get(depth) + (column * 150); // Sub-columns
+      const y = startY + (rowInColumn * ySpacing);
+      positions.set(nodeId, { x, y });
+    });
+  });
+  
+  // Special handling for Canvas node
+  const canvasNode = nodes.find(n => n.name === 'Canvas');
+  if (canvasNode) {
+    // Position Canvas to the right and slightly below
+    let maxX = 0;
+    let avgY = 0;
+    let count = 0;
+    
+    positions.forEach((pos, id) => {
+      if (id !== canvasNode.id) {
+        maxX = Math.max(maxX, pos.x);
+        avgY += pos.y;
+        count++;
+      }
+    });
+    
+    if (count > 0) {
+      avgY = avgY / count;
+    } else {
+      avgY = 200;
+    }
+    
+    positions.set(canvasNode.id, {
+      x: maxX + 180,
+      y: avgY + 50
+    });
+  }
+  
+  return positions;
+}
+
+/**
+ * Further optimize layout to minimize crossings using iterative refinement
+ */
+function optimizeLayoutCrossings(graph, positions) {
+  // Group nodes by their X position (layers)
+  const layers = new Map();
+  
+  positions.forEach((pos, nodeId) => {
+    if (!layers.has(pos.x)) {
+      layers.set(pos.x, []);
+    }
+    layers.get(pos.x).push(nodeId);
+  });
+  
+  // Sort layers by X position
+  const sortedLayers = Array.from(layers.keys()).sort((a, b) => a - b);
+  
+  // Perform multiple passes to minimize crossings
+  const maxPasses = 3;
+  for (let pass = 0; pass < maxPasses; pass++) {
+    let improved = false;
+    
+    // For each adjacent pair of layers
+    for (let i = 0; i < sortedLayers.length - 1; i++) {
+      const leftLayerX = sortedLayers[i];
+      const rightLayerX = sortedLayers[i + 1];
+      const leftNodes = layers.get(leftLayerX);
+      const rightNodes = layers.get(rightLayerX);
+      
+      // Try swapping nodes in the right layer to reduce crossings
+      for (let j = 0; j < rightNodes.length - 1; j++) {
+        for (let k = j + 1; k < rightNodes.length; k++) {
+          const nodeJ = rightNodes[j];
+          const nodeK = rightNodes[k];
+          
+          // Count crossings before swap
+          const crossingsBefore = countCrossings(graph, positions, leftNodes, rightNodes);
+          
+          // Swap positions
+          const posJ = positions.get(nodeJ);
+          const posK = positions.get(nodeK);
+          positions.set(nodeJ, { x: posJ.x, y: posK.y });
+          positions.set(nodeK, { x: posK.x, y: posJ.y });
+          
+          // Count crossings after swap
+          const crossingsAfter = countCrossings(graph, positions, leftNodes, rightNodes);
+          
+          // Keep swap if it reduces crossings
+          if (crossingsAfter < crossingsBefore) {
+            improved = true;
+            // Update the nodes array order
+            rightNodes[j] = nodeK;
+            rightNodes[k] = nodeJ;
+          } else {
+            // Revert swap
+            positions.set(nodeJ, posJ);
+            positions.set(nodeK, posK);
+          }
+        }
+      }
+    }
+    
+    // Stop if no improvements were made
+    if (!improved) break;
+  }
+}
+
+/**
+ * Count edge crossings between two layers
+ */
+function countCrossings(graph, positions, leftNodes, rightNodes) {
+  let crossings = 0;
+  
+  // For each pair of edges between the layers
+  for (let i = 0; i < leftNodes.length; i++) {
+    const leftNodeData = graph.nodes.get(leftNodes[i]);
+    
+    for (let j = i + 1; j < leftNodes.length; j++) {
+      const otherLeftNodeData = graph.nodes.get(leftNodes[j]);
+      
+      // Check all connections from these left nodes
+      leftNodeData.outputs.forEach(output1 => {
+        if (rightNodes.includes(output1.to)) {
+          otherLeftNodeData.outputs.forEach(output2 => {
+            if (rightNodes.includes(output2.to) && output1.to !== output2.to) {
+              // Check if edges cross
+              const pos1From = positions.get(leftNodes[i]);
+              const pos1To = positions.get(output1.to);
+              const pos2From = positions.get(leftNodes[j]);
+              const pos2To = positions.get(output2.to);
+              
+              if (pos1From && pos1To && pos2From && pos2To) {
+                // Simple crossing check: if the relative Y positions are inverted
+                const crossed = (pos1From.y - pos2From.y) * (pos1To.y - pos2To.y) < 0;
+                if (crossed) crossings++;
+              }
+            }
+          });
+        }
+      });
+    }
+  }
+  
+  return crossings;
+}
+
+/**
+ * Apply calculated positions to nodes
+ */
+function applyLayoutPositions(positions) {
+  positions.forEach((pos, nodeId) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      animateNodeToPosition(node, pos.x, pos.y);
+    }
+  });
+  
+  // Update connections after layout
+  setTimeout(() => {
+    updateConnections();
+    fitGraphToView();
+  }, 600);
+}
+
+/**
+ * Legacy performAutoLayout for backward compatibility
+ */
+function performAutoLayoutLegacy() {
   // Group nodes by category, with special handling for Canvas
   const nodesByCategory = {
     input: nodes.filter(n => n.category === 'input' && n.name !== 'Canvas'),
