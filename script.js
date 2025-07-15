@@ -4663,6 +4663,9 @@ function renderNode(node, time) {
   // Set node-specific uniforms
   setNodeUniforms(node);
   
+  // Bind input textures AFTER setting uniforms
+  bindNodeInputTextures(node);
+  
   // Ensure oscillator color palette is always set
   if (node.type === 'Oscillator' && node.params.colorPalette) {
     const palette = colorPalettes[node.params.colorPalette];
@@ -4990,6 +4993,12 @@ function setNodeUniforms(node) {
     }
   }
 
+}
+
+/**
+ * Bind input textures for a node
+ */
+function bindNodeInputTextures(node) {
   // Debug Layer inputs before binding
   if (node.type === 'Layer') {
     console.log(`🎯 Layer ${node.name} has ${node.inputs.length} inputs:`, 
