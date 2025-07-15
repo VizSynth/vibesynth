@@ -616,7 +616,7 @@ let selectedNode = null;
 let mainOutputNode = null;
 
 // Debug mode for Layer nodes - set to true to see split view
-window.debugLayerSplit = false;
+window.debugLayerSplit = true;
 
 /** Undo/Redo system */
 const undoStack = [];
@@ -5066,7 +5066,10 @@ function bindNodeInputTextures(node) {
           console.error(`🚨 Error binding texture for ${inputNode.name} to ${uniformName}:`, bindError);
         }
       } else {
-        console.warn(`⚠️ Could not find uniform ${uniformName} in ${node.name} shader`);
+        // Only warn if this is actually an expected uniform (not just an unconnected optional input)
+        if (node.type === 'Layer' || node.type === 'Mix' || node.type === 'Composite') {
+          console.warn(`⚠️ Could not find uniform ${uniformName} in ${node.name} shader - this may indicate a shader compilation issue`);
+        }
       }
     }
   });
