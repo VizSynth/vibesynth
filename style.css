@@ -792,6 +792,117 @@ html, body {
   font-size: 14px;
 }
 
+/* Node Properties Panel Redesign */
+.node-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: var(--bg-primary);
+  border-radius: var(--border-radius);
+  margin-bottom: 20px;
+}
+
+.node-header h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.node-type-badge {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.section-icon {
+  margin-right: 6px;
+  font-size: 14px;
+}
+
+/* Connection Fields */
+.connection-field {
+  margin-bottom: 12px;
+}
+
+.connection-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  text-transform: capitalize;
+}
+
+.connection-select,
+.control-select {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.connection-select:hover,
+.control-select:hover {
+  border-color: var(--accent-primary);
+  background: var(--bg-tertiary);
+}
+
+.connection-select:focus,
+.control-select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+/* Output Connections */
+.output-connections-list {
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  padding: 8px;
+}
+
+.output-connection-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  transition: background 0.15s ease;
+}
+
+.output-connection-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.connection-arrow {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.connection-target {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.connection-input {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
 /* I/O Preview Section */
 .io-preview-section {
   background: var(--bg-secondary);

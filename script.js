@@ -3311,60 +3311,92 @@ function showNodeProperties(node) {
 
   console.log('📋 Showing properties for node:', node.name, node.type);
 
-  let html = `<div class="property-group">
-    <h5>Node: ${node.name}</h5>
+  let html = `<div class="property-group node-header">
+    <h4>${node.name}</h4>
+    <div class="node-type-badge">${node.type}</div>
   </div>`;
-
-  // Temporarily disable I/O preview section to fix properties panel
-  // TODO: Re-enable after fixing any issues
-  /*
-  // Add I/O Preview Section for nodes with inputs/outputs
-  if (node.type !== 'MIDIInput' && node.type !== 'AudioInput' && node.type !== 'CursorInput' && 
-      node.type !== 'CameraInput' && node.type !== 'RandomInput') {
-    try {
-      html += `<div class="property-group io-preview-section">
-        <h6><span class="material-icons">visibility</span> Inputs & Output</h6>
-        <div class="io-preview-container">`;
+  
+  // Get available source nodes for dropdowns (exclude self and nodes that would create cycles)
+  const getAvailableSourceNodes = () => {
+    return nodes.filter(n => n !== node && !nodeHasDependency(n, node) && n.category !== 'output');
+  };
+  
+  // Get control input nodes
+  const getControlInputNodes = () => {
+    return nodes.filter(n => n.category === 'input');
+  };
+  
+  // 1. Data Inputs Section (for nodes that accept texture inputs)
+  const nodeDefinition = nodeDefinitions[node.type];
+  if (nodeDefinition && nodeDefinition.inputs && nodeDefinition.inputs.length > 0) {
+    html += `<div class="property-group">
+      <h5><span class="section-icon">📥</span> Data Inputs</h5>`;
+    
+    nodeDefinition.inputs.forEach((inputDef, index) => {
+      const currentInput = node.inputs[index];
+      const inputId = `input-${node.id}-${index}`;
       
-      // Add input previews based on node type
-      const nodeDefinition = nodeDefinitions[node.type];
-      if (nodeDefinition && nodeDefinition.inputs) {
-        nodeDefinition.inputs.forEach((input, index) => {
-          const inputNumber = index + 1;
-          const hasConnection = nodes.some(n => 
-            n.connections && n.connections.some(conn => 
-              conn.toNode === node.id && conn.toInput === inputNumber
-            )
-          );
-          html += `<div class="io-preview-item">
-            <div class="io-preview-label">${input.name}</div>
-            <canvas class="io-preview-canvas" data-type="input" data-index="${inputNumber}" 
-                    width="80" height="60" title="Input ${inputNumber}: ${input.name}">
-            </canvas>
-            <div class="io-connection-status ${hasConnection ? 'connected' : 'disconnected'}">
-              ${hasConnection ? '🔗 Connected' : '⚪ Empty'}
-            </div>
-          </div>`;
-        });
-      }
+      html += `<div class="connection-field">
+        <label class="connection-label" for="${inputId}">${inputDef.name}</label>
+        <select class="connection-select" data-input-index="${index}" id="${inputId}">
+          <option value="">— None —</option>`;
       
-      // Add output preview
-      html += `<div class="io-preview-item output-preview">
-        <div class="io-preview-label">Output</div>
-        <canvas class="io-preview-canvas" data-type="output" data-index="0" 
-                width="80" height="60" title="Node output preview">
-        </canvas>
-        <div class="io-connection-status">
-          <span id="output-info-${node.id}">Processing...</span>
-        </div>
+      getAvailableSourceNodes().forEach(sourceNode => {
+        const selected = currentInput === sourceNode ? 'selected' : '';
+        html += `<option value="${sourceNode.id}" ${selected}>${sourceNode.name} (${sourceNode.type})</option>`;
+      });
+      
+      html += `</select>
       </div>`;
+    });
+    
+    html += `</div>`;
+  }
+  
+  // 2. Control Inputs Section (for parameter modulation)
+  if (node.category !== 'input' && Object.keys(node.params).length > 0) {
+    const mappableParams = Object.entries(node.params).filter(([key, value]) => {
+      return typeof value === 'number' || key === 'colorPalette';
+    });
+    
+    if (mappableParams.length > 0) {
+      html += `<div class="property-group">
+        <h5><span class="section-icon">🎛️</span> Control Inputs</h5>`;
       
-      html += `</div></div>`;
-    } catch (error) {
-      console.error('Error generating I/O preview section:', error);
+      // Show control inputs for each parameter
+      const paramNames = Object.keys(node.params).filter(key => {
+        const value = node.params[key];
+        return typeof value === 'number' || key === 'colorPalette';
+      });
+      
+      paramNames.forEach((paramName, paramIndex) => {
+        const currentControl = node.controlInputs ? node.controlInputs[paramIndex] : null;
+        const controlId = `control-${node.id}-${paramIndex}`;
+        
+        html += `<div class="connection-field">
+          <label class="connection-label" for="${controlId}">${paramName} control</label>
+          <select class="control-select" data-param-index="${paramIndex}" data-param-name="${paramName}" id="${controlId}">
+            <option value="">— None —</option>`;
+        
+        getControlInputNodes().forEach(controlNode => {
+          const selected = currentControl === controlNode ? 'selected' : '';
+          const displayName = controlNode.type === 'MIDIInput' ? 
+            `MIDI CC${controlNode.params.ccNumber}` : controlNode.name;
+          html += `<option value="${controlNode.id}" ${selected}>${displayName}</option>`;
+        });
+        
+        html += `</select>
+        </div>`;
+      });
+      
+      html += `</div>`;
     }
   }
-  */
+
+  // 3. Parameters Section
+  if (Object.keys(node.params).length > 0) {
+    html += `<div class="property-group">
+      <h5><span class="section-icon">⚙️</span> Parameters</h5>`;
 
   // Add special controls for input nodes
   if (node.type === 'AudioInput') {
@@ -3393,8 +3425,8 @@ function showNodeProperties(node) {
     </div>`;
   }
 
-  // Generate property controls based on node type
-  Object.entries(node.params).forEach(([key, value]) => {
+    // Generate property controls based on node type
+    Object.entries(node.params).forEach(([key, value]) => {
     // Add units to certain parameter labels
     let labelText = key;
     if (key === 'interval' && node.type === 'RandomInput') {
@@ -3446,154 +3478,37 @@ function showNodeProperties(node) {
       }
     }
     
-    // Add control input mapping options with toggle (only for mappable parameters)
-    const isMappable = typeof value === 'number' || key === 'colorPalette';
-    if (isMappable) {
-      html += `<div class="control-inputs-container">
-        <button class="control-toggle" data-param="${key}" title="Toggle Control Mapping">
-          <span class="control-icon">🎛️</span>
-        </button>
-        <div class="control-inputs" style="display: none;">
-          <select class="consolidated-mapping-select" data-param="${key}">
-            <option value="">Add Input Mapping</option>
-            <optgroup label="MIDI Controller">
-              <option value="midi">Map MIDI CC (click to learn)</option>
-            </optgroup>`;
-      
-      // Only show audio mapping for numeric parameters and colorPalette
-      if (typeof value === 'number' || key === 'colorPalette') {
-        const audioLabel = key === 'colorPalette' ? 'Audio → Palette' : 'Audio Analysis';
-        html += `<optgroup label="${audioLabel}">
-              <option value="audio:bass">Bass (0-120Hz)</option>
-              <option value="audio:lowMids">Low Mids (120-500Hz)</option>
-              <option value="audio:mids">Mids (500-2kHz)</option>
-              <option value="audio:highMids">High Mids (2-8kHz)</option>
-              <option value="audio:highs">Highs (8-20kHz)</option>
-              <option value="audio:overall">Overall Amplitude</option>
-              <option value="audio:overall_rms">RMS Level</option>
-              <option value="audio:overall_peak">Peak Level</option>
-              <option value="audio:lufs">LUFS Loudness</option>
-              <option value="audio:bass_rms">Bass RMS</option>
-              <option value="audio:lowMids_rms">Low Mids RMS</option>
-              <option value="audio:mids_rms">Mids RMS</option>
-            </optgroup>`;
-      }
-      
-      // Color mapping available for all mappable parameters
-      html += `<optgroup label="Color Analysis">
-              <option value="color:red">Red Component</option>
-              <option value="color:green">Green Component</option>
-              <option value="color:blue">Blue Component</option>
-              <option value="color:hue">Hue (0-360)</option>
-              <option value="color:saturation">Saturation</option>
-              <option value="color:brightness">Brightness</option>
-              <option value="color:luminance">Luminance</option>
-            </optgroup>
-            <optgroup label="Cursor Input">
-              <option value="cursor:x">X Position</option>
-              <option value="cursor:y">Y Position</option>
-              <option value="cursor:velocity">Movement Velocity</option>
-              <option value="cursor:click">Click State</option>
-            </optgroup>
-            <optgroup label="Camera Input">
-              <option value="camera:brightness">Brightness</option>
-              <option value="camera:motion">Motion Detection</option>
-              <option value="camera:contrast">Contrast</option>
-              <option value="camera:redAvg">Red Average</option>
-              <option value="camera:greenAvg">Green Average</option>
-              <option value="camera:blueAvg">Blue Average</option>
-            </optgroup>
-`;
-      
-      
-      html += `</select>
-        <button class="remove-all-mappings" data-param="${key}" title="Clear All Mappings">🗑️</button>
-        </div>
-      </div>`;
-    }
     
-    html += '</div>';
-  });
-
-  // Add control input mappings section
-  html += `<div class="property-group">
-    <h5>Control Inputs</h5>
-    <div id="control-mappings">`;
-  
-  // Generate mapping display inline
-  let mappingHtml = '';
-  
-  // Show MIDI mappings
-  Object.entries(controlInputs.midi).forEach(([ccNum, mapping]) => {
-    if (mapping.nodeId === node.id) {
-      mappingHtml += `<div class="mapping-item">
-        <span>MIDI CC${ccNum} → ${mapping.param}</span>
-        <button class="remove-mapping" data-type="midi" data-key="${ccNum}">×</button>
-      </div>`;
-    }
-  });
-  
-  // Show audio mappings
-  Object.entries(controlInputs.audio).forEach(([bandName, mappings]) => {
-    mappings.forEach((mapping, index) => {
-      if (mapping.nodeId === node.id) {
-        mappingHtml += `<div class="mapping-item">
-          <span>Audio ${bandName} → ${mapping.param}</span>
-          <button class="remove-mapping" data-type="audio" data-key="${bandName}" data-index="${index}">×</button>
-        </div>`;
-      }
+      html += '</div>';
     });
-  });
-  
-  // Show color mappings
-  Object.entries(controlInputs.color).forEach(([componentName, mappings]) => {
-    mappings.forEach((mapping, index) => {
-      if (mapping.nodeId === node.id) {
-        mappingHtml += `<div class="mapping-item">
-          <span>Color ${componentName} → ${mapping.param}</span>
-          <button class="remove-mapping" data-type="color" data-key="${componentName}" data-index="${index}">×</button>
-        </div>`;
-      }
-    });
-  });
-  
-  // Show cursor mappings
-  Object.entries(controlInputs.cursor).forEach(([componentName, mappings]) => {
-    mappings.forEach((mapping, index) => {
-      if (mapping.nodeId === node.id) {
-        mappingHtml += `<div class="mapping-item">
-          <span>Cursor ${componentName} → ${mapping.param}</span>
-          <button class="remove-mapping" data-type="cursor" data-key="${componentName}" data-index="${index}">×</button>
-        </div>`;
-      }
-    });
-  });
-  
-  // Show camera mappings
-  Object.entries(controlInputs.camera).forEach(([componentName, mappings]) => {
-    mappings.forEach((mapping, index) => {
-      if (mapping.nodeId === node.id) {
-        mappingHtml += `<div class="mapping-item">
-          <span>Camera ${componentName} → ${mapping.param}</span>
-          <button class="remove-mapping" data-type="camera" data-key="${componentName}" data-index="${index}">×</button>
-        </div>`;
-      }
-    });
-  });
-  
-  if (mappingHtml === '') {
-    mappingHtml = '<div class="mapping-empty">No control inputs mapped</div>';
+    
+    html += `</div>`;
   }
   
-  html += mappingHtml + `</div>
-  </div>`;
+  // 4. Output Connections Section (show what nodes use this as input)
+  const outputConnections = nodes.filter(n => n.inputs.includes(node));
+  if (outputConnections.length > 0) {
+    html += `<div class="property-group">
+      <h5><span class="section-icon">📤</span> Output Connections</h5>
+      <div class="output-connections-list">`;
+    
+    outputConnections.forEach(targetNode => {
+      const inputIndex = targetNode.inputs.indexOf(node);
+      const inputDef = nodeDefinitions[targetNode.type]?.inputs?.[inputIndex];
+      const inputName = inputDef ? inputDef.name : `Input ${inputIndex + 1}`;
+      
+      html += `<div class="output-connection-item">
+        <span class="connection-arrow">→</span>
+        <span class="connection-target">${targetNode.name}</span>
+        <span class="connection-input">(${inputName})</span>
+      </div>`;
+    });
+    
+    html += `</div></div>`;
+  }
 
   panel.innerHTML = html;
 
-  // Temporarily disable I/O preview updates
-  // requestAnimationFrame(() => {
-  //   updateIOPreviews(node);
-  // });
 
   // Add event listeners for property changes
   panel.querySelectorAll('.property-input, .property-slider, .property-number').forEach(input => {
@@ -3672,35 +3587,57 @@ function showNodeProperties(node) {
     });
   });
 
-  // Add event listeners for control toggle buttons
-  panel.querySelectorAll('.control-toggle').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const param = e.target.closest('.control-toggle').dataset.param;
-      const container = e.target.closest('.control-inputs-container');
-      const controlInputs = container.querySelector('.control-inputs');
-      const icon = container.querySelector('.control-icon');
+  // Add event listeners for data input connections
+  panel.querySelectorAll('.connection-select').forEach(select => {
+    select.addEventListener('change', (e) => {
+      const inputIndex = parseInt(e.target.dataset.inputIndex);
+      const sourceNodeId = e.target.value;
       
-      if (controlInputs.style.display === 'none') {
-        controlInputs.style.display = 'flex';
-        icon.textContent = '🎚️'; // Different icon when expanded
-        btn.title = 'Hide Control Mapping';
+      if (sourceNodeId) {
+        const sourceNode = nodes.find(n => n.id === sourceNodeId);
+        if (sourceNode) {
+          node.inputs[inputIndex] = sourceNode;
+          console.log(`Connected ${sourceNode.name} to ${node.name} input ${inputIndex}`);
+        }
       } else {
-        controlInputs.style.display = 'none';
-        icon.textContent = '🎛️'; // Original icon when collapsed
-        btn.title = 'Show Control Mapping';
+        node.inputs[inputIndex] = null;
+        console.log(`Disconnected input ${inputIndex} from ${node.name}`);
       }
+      
+      updateConnections();
+      markUnsaved();
+      saveState(`Change input connection`);
     });
   });
-
-  // Add event listeners for consolidated control input mapping
-  panel.querySelectorAll('.consolidated-mapping-select').forEach(select => {
+  
+  // Add event listeners for control input connections
+  panel.querySelectorAll('.control-select').forEach(select => {
     select.addEventListener('change', (e) => {
-      const param = e.target.dataset.param;
-      const value = e.target.value;
+      const paramIndex = parseInt(e.target.dataset.paramIndex);
+      const paramName = e.target.dataset.paramName;
+      const controlNodeId = e.target.value;
       
-      if (value) {
-        if (value === 'midi') {
-          // Handle MIDI mapping
+      // Initialize controlInputs array if needed
+      if (!node.controlInputs) {
+        node.controlInputs = [];
+      }
+      
+      if (controlNodeId) {
+        const controlNode = nodes.find(n => n.id === controlNodeId);
+        if (controlNode) {
+          node.controlInputs[paramIndex] = controlNode;
+          console.log(`Connected ${controlNode.name} to ${node.name} ${paramName} control`);
+        }
+      } else {
+        node.controlInputs[paramIndex] = null;
+        console.log(`Disconnected ${paramName} control from ${node.name}`);
+      }
+      
+      updateConnections();
+      markUnsaved();
+      saveState(`Change control connection`);
+    });
+  });
           startMIDIMapping(node, param);
         } else if (value.startsWith('audio:')) {
           // Handle audio mapping
@@ -4962,7 +4899,7 @@ function setNodeUniforms(node) {
       // Special handling for multi-input nodes that expect numbered textures starting from 1
       const isMultiInputNode = node.type === 'Mix' || node.type === 'Layer' || node.type === 'Composite';
       const uniformName = isMultiInputNode ? `u_texture${index + 1}` : (index === 0 ? "u_texture" : `u_texture${index + 1}`);
-      const loc = gl.getUniformLocation(program, uniformName);
+      const loc = gl.getUniformLocation(node.program, uniformName);
       if (loc) {
         gl.activeTexture(gl.TEXTURE0 + index);
         gl.bindTexture(gl.TEXTURE_2D, inputNode.texture);
