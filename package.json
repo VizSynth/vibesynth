@@ -7,10 +7,7 @@
     "start": "python3 -m http.server 8080",
     "build": "echo 'No build step required for vanilla JS'"
   },
-  "dependencies": {
-    "elkjs": "^0.9.3",
-    "dagre": "^0.8.5"
-  },
+  "dependencies": {},
   "devDependencies": {},
   "keywords": [
     "visual-synthesizer",
