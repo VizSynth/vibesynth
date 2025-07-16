@@ -1,0 +1,23 @@
+{
+  "name": "web-visual-synthesizer",
+  "version": "1.0.0",
+  "description": "A web-based visual synthesizer with node-based graph editing",
+  "main": "script.js",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "build": "echo 'No build step required for vanilla JS'"
+  },
+  "dependencies": {
+    "elkjs": "^0.9.3",
+    "dagre": "^0.8.5"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "visual-synthesizer",
+    "webgl",
+    "node-editor",
+    "graph-layout"
+  ],
+  "author": "",
+  "license": "MIT"
+}

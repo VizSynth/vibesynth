@@ -2083,13 +2083,13 @@ function initUI() {
   document.getElementById('reset-zoom-btn').addEventListener('click', resetGraphZoom);
 
   // Auto-layout toggle
-  document.getElementById('auto-layout-btn').addEventListener('click', () => {
+  document.getElementById('auto-layout-btn').addEventListener('click', async () => {
     autoLayoutEnabled = !autoLayoutEnabled;
     const btn = document.getElementById('auto-layout-btn');
     if (autoLayoutEnabled) {
       btn.classList.add('active');
       btn.title = 'Auto Layout (On)';
-      performAutoLayout(); // Apply layout immediately when enabled
+      await applyAutoLayout(); // Apply layout immediately when enabled
     } else {
       btn.classList.remove('active');
       btn.title = 'Auto Layout (Off)';
@@ -2189,15 +2189,397 @@ function createFinalOutputNode() {
   return finalOutputNode;
 }
 
+// Layout configuration
+const LAYOUT_ENGINE = "elk";      // quickly swap to "dagre" to compare
+const DIR          = "RIGHT";     // "RIGHT", "DOWN", etc.
+
 /**
- * Auto-layout system - organizes nodes in clean layers with proper spacing
+ * Modern auto-layout using ELK.js or Dagre
  */
-function performAutoLayout() {
+async function applyAutoLayout() {
+  Logger.info(`Applying auto-layout with ${LAYOUT_ENGINE}...`);
+  showAutoLayoutFeedback();
+  
+  try {
+    // Prepare nodes and edges for layout
+    const layoutNodes = [];
+    const layoutEdges = [];
+    
+    // Get all nodes (excluding Canvas/FinalOutput)
+    nodes.forEach(node => {
+      if (node.type !== 'FinalOutput' && node.name !== 'Canvas') {
+        layoutNodes.push({
+          id: node.id.toString(),
+          width: node.width || 160,
+          height: node.height || 80
+        });
+      }
+    });
+    
+    // Get all connections/edges
+    nodes.forEach(node => {
+      // Main inputs
+      if (node.inputs) {
+        node.inputs.forEach((input, idx) => {
+          if (input && input.id) {
+            layoutEdges.push({
+              from: input.id.toString(),
+              to: node.id.toString()
+            });
+          }
+        });
+      }
+      
+      // Control inputs
+      if (node.controlInputs) {
+        node.controlInputs.forEach((input, idx) => {
+          if (input && input.id) {
+            layoutEdges.push({
+              from: input.id.toString(),
+              to: node.id.toString()
+            });
+          }
+        });
+      }
+    });
+    
+    // Apply the selected layout engine
+    const pos = LAYOUT_ENGINE === "elk"
+      ? await elkLayout(layoutNodes, layoutEdges, DIR)
+      : dagreLayout(layoutNodes, layoutEdges, DIR === "RIGHT" ? "LR" : "TB");
+    
+    // Apply positions to nodes with animation
+    for (const node of nodes) {
+      const nodePos = pos.get(node.id.toString());
+      if (nodePos) {
+        const { x, y } = nodePos;
+        // Add offset for better positioning
+        animateNodeToPosition(node, x + 100, y + 100);
+      }
+    }
+    
+    // Special handling for Canvas node
+    const canvasNode = nodes.find(n => n.type === 'FinalOutput' || n.name === 'Canvas');
+    if (canvasNode) {
+      // Find the rightmost node position
+      let maxX = 100;
+      let avgY = 100;
+      let nodeCount = 0;
+      
+      nodes.forEach(node => {
+        if (node !== canvasNode && pos.has(node.id.toString())) {
+          const nodePos = pos.get(node.id.toString());
+          maxX = Math.max(maxX, nodePos.x + (node.width || 160));
+          avgY += nodePos.y;
+          nodeCount++;
+        }
+      });
+      
+      if (nodeCount > 0) {
+        avgY = avgY / nodeCount;
+      }
+      
+      // Position Canvas to the right of all nodes
+      animateNodeToPosition(canvasNode, maxX + 250, avgY);
+    }
+    
+    // Update connections after layout
+    setTimeout(() => {
+      updateConnections();
+    }, 600);
+    
+  } catch (error) {
+    Logger.error(`Layout with ${LAYOUT_ENGINE} failed:`, error);
+    // Fallback to the other engine
+    if (LAYOUT_ENGINE === "elk") {
+      Logger.info('Falling back to Dagre...');
+      await applyAutoLayoutWithDagre();
+    } else {
+      Logger.info('Falling back to manual layout...');
+      performAutoLayoutManual();
+    }
+  }
+}
+
+/**
+ * Fallback to Dagre if ELK fails
+ */
+async function applyAutoLayoutWithDagre() {
+  try {
+    const layoutNodes = [];
+    const layoutEdges = [];
+    
+    nodes.forEach(node => {
+      if (node.type !== 'FinalOutput' && node.name !== 'Canvas') {
+        layoutNodes.push({
+          id: node.id.toString(),
+          width: node.width || 160,
+          height: node.height || 80
+        });
+      }
+    });
+    
+    nodes.forEach(node => {
+      if (node.inputs) {
+        node.inputs.forEach((input, idx) => {
+          if (input && input.id) {
+            layoutEdges.push({
+              from: input.id.toString(),
+              to: node.id.toString()
+            });
+          }
+        });
+      }
+      
+      if (node.controlInputs) {
+        node.controlInputs.forEach((input, idx) => {
+          if (input && input.id) {
+            layoutEdges.push({
+              from: input.id.toString(),
+              to: node.id.toString()
+            });
+          }
+        });
+      }
+    });
+    
+    const pos = dagreLayout(layoutNodes, layoutEdges, "LR");
+    
+    for (const node of nodes) {
+      const nodePos = pos.get(node.id.toString());
+      if (nodePos) {
+        const { x, y } = nodePos;
+        animateNodeToPosition(node, x + 100, y + 100);
+      }
+    }
+    
+    const canvasNode = nodes.find(n => n.type === 'FinalOutput' || n.name === 'Canvas');
+    if (canvasNode) {
+      let maxX = 100;
+      let avgY = 100;
+      let nodeCount = 0;
+      
+      nodes.forEach(node => {
+        if (node !== canvasNode && pos.has(node.id.toString())) {
+          const nodePos = pos.get(node.id.toString());
+          maxX = Math.max(maxX, nodePos.x + (node.width || 160));
+          avgY += nodePos.y;
+          nodeCount++;
+        }
+      });
+      
+      if (nodeCount > 0) {
+        avgY = avgY / nodeCount;
+      }
+      
+      animateNodeToPosition(canvasNode, maxX + 250, avgY);
+    }
+    
+    setTimeout(() => {
+      updateConnections();
+    }, 600);
+    
+  } catch (error) {
+    Logger.error('Dagre layout also failed:', error);
+    performAutoLayoutManual();
+  }
+}
+
+/**
+ * Legacy auto-layout system - uses ELK.js for professional graph layout
+ */
+async function performAutoLayout() {
   if (!autoLayoutEnabled) return;
 
-  Logger.info('Performing auto-layout...');
+  Logger.info('Performing auto-layout with ELK.js...');
   showAutoLayoutFeedback();
 
+  try {
+    // Prepare nodes and edges for layout
+    const layoutNodes = [];
+    const layoutEdges = [];
+    
+    // Convert our nodes to layout format
+    nodes.forEach(node => {
+      if (node.type !== 'FinalOutput' && node.name !== 'Canvas') {
+        layoutNodes.push({
+          id: node.id.toString(),
+          width: node.width || 160,
+          height: node.height || 80
+        });
+      }
+    });
+    
+    // Build edges from connections
+    nodes.forEach(node => {
+      // Main inputs
+      node.inputs.forEach((input, idx) => {
+        if (input && input.id) {
+          layoutEdges.push({
+            from: input.id.toString(),
+            to: node.id.toString()
+          });
+        }
+      });
+      
+      // Control inputs
+      if (node.controlInputs) {
+        node.controlInputs.forEach((input, idx) => {
+          if (input && input.id) {
+            layoutEdges.push({
+              from: input.id.toString(),
+              to: node.id.toString()
+            });
+          }
+        });
+      }
+    });
+    
+    // Use ELK to calculate positions
+    const positions = await elkLayout(layoutNodes, layoutEdges, "RIGHT");
+    
+    // Apply positions with animation
+    const startOffset = { x: 100, y: 100 };
+    nodes.forEach(node => {
+      if (positions.has(node.id.toString())) {
+        const pos = positions.get(node.id.toString());
+        animateNodeToPosition(node, pos.x + startOffset.x, pos.y + startOffset.y);
+      }
+    });
+    
+    // Position Canvas node
+    const canvasNode = nodes.find(n => n.type === 'FinalOutput' || n.name === 'Canvas');
+    if (canvasNode) {
+      // Find rightmost position
+      let maxX = startOffset.x;
+      let centerY = startOffset.y;
+      let nodeCount = 0;
+      
+      nodes.forEach(node => {
+        if (node !== canvasNode) {
+          maxX = Math.max(maxX, node.x + (node.width || 160));
+          centerY += node.y;
+          nodeCount++;
+        }
+      });
+      
+      if (nodeCount > 0) {
+        centerY = centerY / nodeCount;
+      }
+      
+      // Position Canvas to the right
+      animateNodeToPosition(canvasNode, maxX + 200, centerY);
+    }
+    
+    // Update connections after animation
+    setTimeout(() => {
+      updateConnections();
+      fitGraphToView();
+    }, 600);
+    
+  } catch (error) {
+    Logger.error('ELK layout failed, falling back to dagre:', error);
+    
+    // Fallback to dagre
+    performAutoLayoutDagre();
+  }
+}
+
+/**
+ * Fallback layout using Dagre
+ */
+function performAutoLayoutDagre() {
+  Logger.info('Using Dagre fallback layout...');
+  
+  try {
+    // Prepare nodes and edges
+    const layoutNodes = [];
+    const layoutEdges = [];
+    
+    nodes.forEach(node => {
+      if (node.type !== 'FinalOutput' && node.name !== 'Canvas') {
+        layoutNodes.push({
+          id: node.id.toString(),
+          width: node.width || 160,
+          height: node.height || 80
+        });
+      }
+    });
+    
+    nodes.forEach(node => {
+      node.inputs.forEach((input, idx) => {
+        if (input && input.id) {
+          layoutEdges.push({
+            from: input.id.toString(),
+            to: node.id.toString()
+          });
+        }
+      });
+      
+      if (node.controlInputs) {
+        node.controlInputs.forEach((input, idx) => {
+          if (input && input.id) {
+            layoutEdges.push({
+              from: input.id.toString(),
+              to: node.id.toString()
+            });
+          }
+        });
+      }
+    });
+    
+    // Use Dagre to calculate positions
+    const positions = dagreLayout(layoutNodes, layoutEdges, "LR");
+    
+    // Apply positions
+    const startOffset = { x: 100, y: 100 };
+    nodes.forEach(node => {
+      if (positions.has(node.id.toString())) {
+        const pos = positions.get(node.id.toString());
+        animateNodeToPosition(node, pos.x + startOffset.x, pos.y + startOffset.y);
+      }
+    });
+    
+    // Position Canvas node
+    const canvasNode = nodes.find(n => n.type === 'FinalOutput' || n.name === 'Canvas');
+    if (canvasNode) {
+      let maxX = startOffset.x;
+      let centerY = startOffset.y;
+      let nodeCount = 0;
+      
+      nodes.forEach(node => {
+        if (node !== canvasNode) {
+          maxX = Math.max(maxX, node.x + (node.width || 160));
+          centerY += node.y;
+          nodeCount++;
+        }
+      });
+      
+      if (nodeCount > 0) {
+        centerY = centerY / nodeCount;
+      }
+      
+      animateNodeToPosition(canvasNode, maxX + 200, centerY);
+    }
+    
+    setTimeout(() => {
+      updateConnections();
+      fitGraphToView();
+    }, 600);
+    
+  } catch (error) {
+    Logger.error('Dagre layout also failed:', error);
+    // Fall back to the original manual layout
+    performAutoLayoutManual();
+  }
+}
+
+/**
+ * Original manual layout as final fallback
+ */
+function performAutoLayoutManual() {
+  Logger.info('Using manual fallback layout...');
+  
   // Improved layout configuration
   const SPACING = {
     x: 300,      // Horizontal spacing between columns (increased)
