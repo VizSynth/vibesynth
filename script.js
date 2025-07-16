@@ -739,7 +739,7 @@ let tempConnection = null;
 let connectionUpdateTimer = null;
 
 /** Auto-layout system */
-let autoLayoutEnabled = true;
+let autoLayoutEnabled = false; // Disabled by default to prevent constant repositioning
 const LAYOUT_CONFIG = {
   // Layer positions from left to right
   layers: {
@@ -1167,12 +1167,7 @@ function init() {
   startCameraAnalysis();
   startMemoryMonitoring();
 
-  // Perform initial auto-layout after everything is initialized
-  setTimeout(() => {
-    if (autoLayoutEnabled) {
-      performAutoLayout();
-    }
-  }, 500); // Give time for all nodes to be created and rendered
+  // Don't perform auto-layout on initialization - let user trigger it manually
 }
 
 /**
@@ -3141,10 +3136,8 @@ function createNode(type, x = 100, y = 100) {
   updateMainOutputDropdown();
   updateExistingControlInputs(); // Update control input manager
 
-  // Perform auto-layout after adding node (only if system is fully initialized)
-  if (autoLayoutEnabled && nodes.length > 1) { // Don't auto-layout if only Canvas exists
-    setTimeout(() => performAutoLayout(), 100); // Small delay for DOM updates
-  }
+  // Don't auto-layout on every node addition - it causes constant repositioning
+  // Auto-layout should only happen on initial load or manual trigger
 
   // Save state for undo
   saveState(`Add ${type} Node`);
@@ -3275,10 +3268,7 @@ function deleteNode(node) {
   updateMainOutputDropdown();
   updateExistingControlInputs(); // Update control input manager
 
-  // Trigger auto-layout after node deletion
-  if (autoLayoutEnabled) {
-    setTimeout(() => performAutoLayout(), 100);
-  }
+  // Don't auto-layout on deletion - causes constant repositioning
 
   // Save state for undo
   saveState(`Delete ${node.type} Node`);
@@ -3818,29 +3808,20 @@ function setupGraphInteraction() {
           // Output to input connection
           targetNode.inputs[targetInputIndex] = connectionStart.node;
           updateConnections();
-          // Trigger auto-layout after connection
-          if (autoLayoutEnabled) {
-            setTimeout(() => performAutoLayout(), 100);
-          }
+          // Don't auto-layout on connection changes
           saveState(`Connect ${connectionStart.node.name} → ${targetNode.name}`);
         } else if (connectionStart.isOutput && isTargetControl && targetControlIndex !== null) {
           // Output to control input connection
           if (!targetNode.controlInputs) targetNode.controlInputs = [];
           targetNode.controlInputs[targetControlIndex] = connectionStart.node;
           updateConnections();
-          // Trigger auto-layout after control connection
-          if (autoLayoutEnabled) {
-            setTimeout(() => performAutoLayout(), 100);
-          }
+          // Don't auto-layout on connection changes
           saveState(`Connect ${connectionStart.node.name} → ${targetNode.name} (control)`);
         } else if (!connectionStart.isOutput && isTargetOutput && connectionStart.inputIndex !== null) {
           // Input to output connection
           connectionStart.node.inputs[connectionStart.inputIndex] = targetNode;
           updateConnections();
-          // Trigger auto-layout after connection
-          if (autoLayoutEnabled) {
-            setTimeout(() => performAutoLayout(), 100);
-          }
+          // Don't auto-layout on connection changes
           saveState(`Connect ${targetNode.name} → ${connectionStart.node.name}`);
         }
       }
@@ -3954,10 +3935,7 @@ function setupConnectionDragging() {
 
           // Update connections and save state
           updateConnections();
-          // Trigger auto-layout after disconnection
-          if (autoLayoutEnabled) {
-            setTimeout(() => performAutoLayout(), 100);
-          }
+          // Don't auto-layout on disconnection
           saveState('Disconnect Connection');
         }
       } else {
