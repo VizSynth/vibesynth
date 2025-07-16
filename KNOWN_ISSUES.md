@@ -12,43 +12,37 @@
 - Added swap inputs button (⇄) to easily reverse base/blend layers
 - Added debug indicators (disabled by default) to verify texture sampling
 
-### 2. Input/Output Preview Canvases Not Rendering
-**Status**: 🔴 CRITICAL  
-**Description**: The preview canvases in the node properties panel remain blank/black.
+### 2. Input/Output Preview Canvases [FIXED]
+**Status**: ✅ FIXED  
+**Description**: The preview canvases in the node properties panel were blank/black.
 
-**Symptoms**:
-- Input preview canvases show "No Input" even when inputs are connected
-- Output preview canvas remains black
-- No WebGL errors in console related to preview rendering
+**Solution Applied**:
+- Implemented complete `drawTextureToCanvas()` function with proper error handling
+- Added WebGL state preservation and restoration
+- Proper framebuffer creation and cleanup
+- Error states show "Error" text instead of black canvas
 
-**Root Cause Analysis**:
-- `drawTextureToCanvas()` function may have framebuffer issues
-- Possible timing issue with preview updates
-- Canvas context or WebGL state conflicts
-
-### 3. WebGL Texture Validation Errors
-**Status**: 🟡 MODERATE  
+### 3. WebGL Texture Validation Errors [FIXED]
+**Status**: ✅ FIXED  
 **Description**: Multiple WebGL errors related to texture operations.
 
-**Symptoms**:
-- "Error getting texture parameters" warnings
-- Invalid enum errors (1280) when validating textures
-- Fallback textures being created unnecessarily
-
-**Root Cause Analysis**:
-- Removed problematic `gl.getTexParameter()` calls but issues persist
-- Texture state validation happening at wrong times
-- Possible texture deletion/recreation timing issues
+**Solution Applied**:
+- Removed all problematic `gl.getTexParameter()` calls
+- Eliminated unnecessary texture validation
+- No more "Error getting texture parameters" or Invalid enum (1280) errors
+- Textures are trusted after successful creation
 
 ## Non-Critical Issues
 
-### 4. Control Input Connections Not Working
-**Status**: 🟡 MODERATE  
-**Description**: The new unified connection UI for control inputs may not be properly connecting control nodes.
+### 4. Control Input Connections [FIXED]
+**Status**: ✅ FIXED  
+**Description**: Control input connections now properly visualized and functional.
 
-**Symptoms**:
-- Control input dropdowns show available nodes but connections may not update parameters
-- No visual feedback for active control connections
+**Solution Applied**:
+- Control connections are drawn with proper visual feedback
+- Handles both expanded and collapsed control port states
+- Visual connections update in real-time
+- Control inputs successfully modulate parameters
 
 ### 5. Debug Console Spam [FIXED]
 **Status**: ✅ FIXED  
@@ -60,48 +54,60 @@
 - Removed temporary debug functions and test helpers
 - Default log level set to INFO for clean console output
 
-## Fix Priority Plan
+## Currently Open Issues
 
-### Phase 2: Fix Preview System (CRITICAL)
-1. **Debug drawTextureToCanvas function**
-   - Add error checking for framebuffer operations
-   - Verify canvas contexts are valid
-   - Check for GL state conflicts
+### 1. Composite Node Rendering [FIXED]
+**Status**: ✅ FIXED  
+**Description**: Composite nodes were showing black output instead of blended inputs.
 
-2. **Implement robust preview pipeline**
-   - Use separate framebuffers for previews
-   - Add proper error recovery
-   - Implement fallback rendering
+**Solution Applied**:
+- Fixed u_activeInputs uniform handling
+- Rewrote shader to use additive blending with opacity normalization
+- Converted integer comparisons to float for WebGL ES compatibility
 
-### Phase 3: Clean Up WebGL Errors (MODERATE)
-1. **Remove unnecessary texture validation**
-   - Only validate textures when absolutely necessary
-   - Trust WebGL state after successful operations
+### 2. Auto-Layout System [ENHANCED]
+**Status**: ✅ ENHANCED  
+**Description**: Auto-layout system has been modernized with ELK.js and Dagre.
 
-2. **Implement proper error boundaries**
-   - Catch and handle specific WebGL errors
-   - Provide meaningful fallbacks
-
-### Phase 4: Verify Control System (MODERATE)
-1. **Test control input connections**
-   - Verify parameter updates from control nodes
-   - Add visual indicators for active connections
+**Recent Improvements**:
+- Integrated ELK.js for professional layered graph layouts
+- Added Dagre as fallback for hierarchical layouts
+- Auto-layout enabled by default
+- Disables automatically when user drags nodes
+- Re-runs after connection changes
+- Visual feedback during layout operation
 
 ## Testing Protocol
 
-After each fix:
-1. Test Layer node with two different inputs
-2. Verify preview canvases update in real-time
-3. Check console for WebGL errors
-4. Test all blend modes
-5. Verify control inputs update parameters
-6. Run full node graph with multiple connections
+Regular testing should include:
+1. Test Layer node with multiple blend modes
+2. Verify preview canvases show real-time updates
+3. Check console remains clean (use Logger panel to adjust verbosity)
+4. Test control input parameter modulation
+5. Verify auto-layout behavior with complex graphs
+6. Test Composite node with 1-4 inputs
 
 ## Success Criteria
 
-- Layer nodes properly blend two different input textures
-- All blend modes produce visually distinct results
-- Preview canvases show real-time texture content
-- No WebGL errors in console during normal operation
-- Control inputs successfully modulate parameters
-- Console output is clean and informative
+✅ Layer nodes properly blend textures with all blend modes
+✅ Preview canvases display real-time content
+✅ No WebGL errors during normal operation
+✅ Control inputs successfully modulate parameters
+✅ Clean console output with configurable logging
+✅ Professional auto-layout with user-friendly behavior
+✅ Composite nodes blend multiple inputs correctly
+
+## Future Enhancements
+
+1. **Performance Optimization**
+   - Implement texture pooling for better memory management
+   - Add level-of-detail for complex graphs
+   
+2. **User Experience**
+   - Add more keyboard shortcuts
+   - Implement node search/filter functionality
+   
+3. **Advanced Features**
+   - Add more node types (Feedback, Delay, etc.)
+   - Implement node presets/templates
+   - Add MIDI learn functionality

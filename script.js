@@ -739,7 +739,7 @@ let tempConnection = null;
 let connectionUpdateTimer = null;
 
 /** Auto-layout system */
-let autoLayoutEnabled = false; // Disabled by default to prevent constant repositioning
+let autoLayoutEnabled = true; // Enabled by default for better initial experience
 const LAYOUT_CONFIG = {
   // Layer positions from left to right
   layers: {
@@ -2197,7 +2197,15 @@ const DIR          = "RIGHT";     // "RIGHT", "DOWN", etc.
  * Modern auto-layout using ELK.js or Dagre
  */
 async function applyAutoLayout() {
+  if (!autoLayoutEnabled) return;
+  
   Logger.info(`Applying auto-layout with ${LAYOUT_ENGINE}...`);
+  
+  // Show visual feedback
+  const btn = document.getElementById('auto-layout-btn');
+  const originalTitle = btn.title;
+  btn.classList.add('loading');
+  btn.title = 'Applying layout...';
   showAutoLayoutFeedback();
   
   try {
@@ -2286,10 +2294,17 @@ async function applyAutoLayout() {
     // Update connections after layout
     setTimeout(() => {
       updateConnections();
+      // Restore button state
+      btn.classList.remove('loading');
+      btn.title = originalTitle;
     }, 600);
     
   } catch (error) {
     Logger.error(`Layout with ${LAYOUT_ENGINE} failed:`, error);
+    // Restore button state
+    btn.classList.remove('loading');
+    btn.title = originalTitle;
+    
     // Fallback to the other engine
     if (LAYOUT_ENGINE === "elk") {
       Logger.info('Falling back to Dagre...');
@@ -4116,7 +4131,8 @@ function setupGraphInteraction() {
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1;
+      // Make zoom 5x less sensitive (20% of original sensitivity)
+      const scaleFactor = e.deltaY > 0 ? 0.98 : 1.02;
       const newScale = Math.max(0.1, Math.min(3, graphTransform.scale * scaleFactor));
 
       // Zoom towards mouse position
@@ -4140,6 +4156,15 @@ function setupGraphInteraction() {
       graphTransform.y = e.clientY - panStart.y;
       updateGraphTransform();
     } else if (isDragging && draggedNode) {
+      // Disable auto-layout when user drags a node
+      if (autoLayoutEnabled) {
+        autoLayoutEnabled = false;
+        const btn = document.getElementById('auto-layout-btn');
+        btn.classList.remove('active');
+        btn.title = 'Auto Layout (Off)';
+        Logger.info('Auto-layout disabled due to manual node dragging');
+      }
+      
       // Calculate position in the transformed coordinate space
       const nodeGraphRect = document.getElementById('node-graph').getBoundingClientRect();
 
@@ -4190,20 +4215,29 @@ function setupGraphInteraction() {
           // Output to input connection
           targetNode.inputs[targetInputIndex] = connectionStart.node;
           updateConnections();
-          // Don't auto-layout on connection changes
+          // Auto-layout after connection if enabled
+          if (autoLayoutEnabled) {
+            setTimeout(() => applyAutoLayout(), 100);
+          }
           saveState(`Connect ${connectionStart.node.name} → ${targetNode.name}`);
         } else if (connectionStart.isOutput && isTargetControl && targetControlIndex !== null) {
           // Output to control input connection
           if (!targetNode.controlInputs) targetNode.controlInputs = [];
           targetNode.controlInputs[targetControlIndex] = connectionStart.node;
           updateConnections();
-          // Don't auto-layout on connection changes
+          // Auto-layout after connection if enabled
+          if (autoLayoutEnabled) {
+            setTimeout(() => applyAutoLayout(), 100);
+          }
           saveState(`Connect ${connectionStart.node.name} → ${targetNode.name} (control)`);
         } else if (!connectionStart.isOutput && isTargetOutput && connectionStart.inputIndex !== null) {
           // Input to output connection
           connectionStart.node.inputs[connectionStart.inputIndex] = targetNode;
           updateConnections();
-          // Don't auto-layout on connection changes
+          // Auto-layout after connection if enabled
+          if (autoLayoutEnabled) {
+            setTimeout(() => applyAutoLayout(), 100);
+          }
           saveState(`Connect ${targetNode.name} → ${connectionStart.node.name}`);
         }
       }
@@ -4317,7 +4351,10 @@ function setupConnectionDragging() {
 
           // Update connections and save state
           updateConnections();
-          // Don't auto-layout on disconnection
+          // Auto-layout after disconnection if enabled
+          if (autoLayoutEnabled) {
+            setTimeout(() => applyAutoLayout(), 100);
+          }
           saveState('Disconnect Connection');
         }
       } else {
@@ -5785,7 +5822,10 @@ function updateInputNodeValue(node, time) {
         node.lastRandomUpdate = now;
       }
 
-      value = node.randomValue;
+      // Calculate the actual value within the configured range
+      const randomMin = node.params.min || 0;
+      const randomMax = node.params.max || 1;
+      value = randomMin + (node.randomValue * (randomMax - randomMin));
       break;
       
     case 'RangeInput':
@@ -5799,8 +5839,9 @@ function updateInputNodeValue(node, time) {
       
       // Calculate step progress
       const range = node.params.max - node.params.min;
-      const steps = Math.abs(range / node.params.step);
-      const stepDuration = 1 / (node.params.speed * steps); // Time per step
+      const steps = Math.max(1, Math.abs(range / (node.params.step || 0.01)));
+      const speed = Math.max(0.000001, node.params.speed || 1); // Allow very slow speeds
+      const stepDuration = 1 / (speed * steps); // Time per step
       
       // Update progress
       const progressDelta = deltaTime / stepDuration;
@@ -5811,11 +5852,13 @@ function updateInputNodeValue(node, time) {
         node.rangeProgress -= progressDelta;
       }
       
-      // Handle looping
+      // Handle looping - ensure progress stays in valid range
       if (node.params.loop) {
-        if (node.rangeProgress > 1) node.rangeProgress -= 1;
+        // Use modulo to wrap around properly
+        node.rangeProgress = node.rangeProgress % 1;
         if (node.rangeProgress < 0) node.rangeProgress += 1;
       } else {
+        // Clamp to 0-1 range
         node.rangeProgress = Math.max(0, Math.min(1, node.rangeProgress));
       }
       
@@ -5826,7 +5869,13 @@ function updateInputNodeValue(node, time) {
           curvedProgress = Math.pow(node.rangeProgress, 2);
           break;
         case 'logarithmic':
-          curvedProgress = Math.log(node.rangeProgress + 0.01) / Math.log(1.01);
+          // Safe logarithmic curve that stays in 0-1 range
+          if (node.rangeProgress <= 0) {
+            curvedProgress = 0;
+          } else {
+            // Use a logarithmic curve from 0 to 1
+            curvedProgress = Math.log(1 + node.rangeProgress * 9) / Math.log(10);
+          }
           break;
         case 'sine':
           curvedProgress = (Math.sin((node.rangeProgress - 0.5) * Math.PI) + 1) / 2;
@@ -5837,19 +5886,37 @@ function updateInputNodeValue(node, time) {
         // 'linear' is default
       }
       
-      value = curvedProgress;
+      // Ensure curvedProgress is always in 0-1 range
+      curvedProgress = Math.max(0, Math.min(1, curvedProgress));
+      
+      // Calculate the actual value within the range
+      const rangeMin = node.params.min || 0;
+      const rangeMax = node.params.max || 1;
+      value = rangeMin + (curvedProgress * (rangeMax - rangeMin));
+      
+      // Final safety check - ensure value is within min/max bounds
+      value = Math.max(rangeMin, Math.min(rangeMax, value));
       break;
   }
 
-  // Map value to node's min/max range
-  const mappedValue = node.params.min + (value * (node.params.max - node.params.min));
-  node.currentValue = mappedValue;
+  // For control inputs, store the raw value (already in correct range)
+  // Don't double-map it
+  node.currentValue = value;
 
   // Update the properties panel display if this node is selected and it's a RandomInput or RangeInput
   if ((node.type === 'RandomInput' || node.type === 'RangeInput') && selectedNode === node) {
     const currentValueDisplay = document.querySelector('.current-value-display');
     if (currentValueDisplay) {
-      currentValueDisplay.textContent = mappedValue.toFixed(3);
+      currentValueDisplay.textContent = value.toFixed(3);
+    }
+    
+    // Also update the progress display for RangeInput
+    if (node.type === 'RangeInput') {
+      const helpText = document.querySelector('.property-field .help-text');
+      if (helpText && node.rangeProgress !== undefined) {
+        const progressPercent = (node.rangeProgress * 100).toFixed(1);
+        helpText.textContent = `Progress: ${progressPercent}% • ${node.params.loop ? 'Looping' : 'One-shot'}`;
+      }
     }
   }
 }
@@ -6025,7 +6092,20 @@ function renderNode(node, time) {
         const paramNames = Object.keys(node.params);
         const paramName = paramNames[controlIndex];
         if (paramName) {
-          const value = controlNode.currentValue; // 0-1 range from input node
+          // Get the control value - it's already in the correct range for RangeInput and RandomInput
+          let value = controlNode.currentValue;
+          
+          // Normalize to 0-1 for parameter mapping
+          if (controlNode.type === 'RangeInput' || controlNode.type === 'RandomInput') {
+            // RangeInput and RandomInput already output values in their configured min/max range
+            // We need to normalize it to 0-1 for the parameter mapping logic below
+            const nodeMin = controlNode.params.min || 0;
+            const nodeMax = controlNode.params.max || 1;
+            value = (value - nodeMin) / (nodeMax - nodeMin);
+          } else {
+            // For other control inputs, assume they output 0-1 range
+            value = value || 0;
+          }
 
           // Handle different parameter types
           if (paramName === 'colorPalette') {
