@@ -100,6 +100,11 @@ const PARAMETER_CONSTRAINTS = {
     values: ['up', 'down'],
     default: 'up'
   },
+  mode: {
+    type: 'string', 
+    values: ['one-way', 'round-trip'],
+    default: 'one-way'
+  },
   blendMode: { type: 'string', values: ['Normal', 'Multiply', 'Screen', 'Overlay'], default: 'Normal' },
   color: { type: 'color', default: '#ff0000' }
 };
@@ -1009,7 +1014,8 @@ class SynthNode {
           speed: 1.0,
           curve: 'linear',
           loop: true,
-          direction: 'up' // 'up' or 'down'
+          direction: 'up', // 'up' or 'down'
+          mode: 'one-way' // 'one-way' or 'round-trip'
         },
         icon: 'timeline',
         category: 'input'
@@ -1163,6 +1169,7 @@ function init() {
 
   startRenderLoop();
   startColorAnalysis();
+  startAudioAnalysis();
   startCursorTracking();
   startCameraAnalysis();
   startMemoryMonitoring();
@@ -2815,7 +2822,7 @@ function performAutoLayoutManual() {
 /**
  * Draw a preview of the curve function for Range nodes
  */
-function drawCurvePreview(canvas, curveType) {
+function drawCurvePreview(canvas, curveType, mode = 'one-way') {
   const ctx = canvas.getContext('2d');
   const width = canvas.width;
   const height = canvas.height;
@@ -2841,7 +2848,7 @@ function drawCurvePreview(canvas, curveType) {
   
   const steps = 100;
   for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
+    let t = i / steps;
     let value = t;
     
     // Apply curve function
@@ -2850,15 +2857,64 @@ function drawCurvePreview(canvas, curveType) {
         value = Math.pow(t, 2);
         break;
       case 'logarithmic':
-        value = Math.log(t + 0.01) / Math.log(1.01);
+        if (t <= 0) {
+          value = 0;
+        } else {
+          value = Math.log(1 + t * 9) / Math.log(10);
+        }
         break;
       case 'sine':
         value = (Math.sin((t - 0.5) * Math.PI) + 1) / 2;
         break;
       case 'bounce':
-        value = Math.abs(Math.sin(t * Math.PI * 2));
+        // Single bounce instead of double
+        value = Math.abs(Math.sin(t * Math.PI));
         break;
       // 'linear' is default
+    }
+    
+    // Apply round-trip mode if enabled
+    if (mode === 'round-trip') {
+      // Special handling for different curves in round-trip mode
+      switch (curveType) {
+        case 'sine':
+          // Full sine wave: 0 -> 1 -> 0
+          value = (Math.sin(t * Math.PI * 2 - Math.PI/2) + 1) / 2;
+          break;
+          
+        case 'bounce':
+          // Single bounce: just use sine for smooth up and down
+          value = Math.sin(t * Math.PI);
+          break;
+          
+        case 'exponential':
+          // Exponential up, exponential down
+          if (t <= 0.5) {
+            value = Math.pow(t * 2, 2);
+          } else {
+            value = Math.pow((1 - t) * 2, 2);
+          }
+          break;
+          
+        case 'logarithmic':
+          // Logarithmic up, logarithmic down
+          if (t <= 0.5) {
+            const progress = t * 2;
+            value = Math.log(1 + progress * 9) / Math.log(10);
+          } else {
+            const progress = (1 - t) * 2;
+            value = Math.log(1 + progress * 9) / Math.log(10);
+          }
+          break;
+          
+        default: // linear
+          // Triangle wave
+          if (t <= 0.5) {
+            value = t * 2;
+          } else {
+            value = 2 - (t * 2);
+          }
+      }
     }
     
     const x = t * width;
@@ -4704,15 +4760,41 @@ function showNodeProperties(node) {
     html += `<div class="property-group">
       <h5><span class="section-icon">⚙️</span> Parameters</h5>`;
 
-  // Add special controls for input nodes
-  if (node.type === 'AudioInput') {
+  // Add special controls and live value displays for input nodes
+  if (node.type === 'MIDIInput') {
+    const currentValue = node.currentValue || 0;
+    html += `<div class="property-field">
+      <div class="property-label">Current Output</div>
+      <div class="current-value-display">${currentValue.toFixed(3)}</div>
+      <div class="help-text">MIDI CC${node.params.ccNumber} value</div>
+    </div>`;
+  } else if (node.type === 'AudioInput') {
+    const currentValue = node.currentValue || 0;
+    html += `<div class="property-field">
+      <div class="property-label">Current Output</div>
+      <div class="current-value-display">${currentValue.toFixed(3)}</div>
+      <div class="help-text">Audio ${node.params.band} level</div>
+    </div>`;
     html += `<div class="property-field">
       <div class="property-label">Audio Access</div>
       <button id="enable-audio-btn-${node.id}" class="create-btn" style="width: 100%;">
         ${audioEnabled ? 'Audio Input Active' : 'Enable Audio Input'}
       </button>
     </div>`;
+  } else if (node.type === 'CursorInput') {
+    const currentValue = node.currentValue || 0;
+    html += `<div class="property-field">
+      <div class="property-label">Current Output</div>
+      <div class="current-value-display">${currentValue.toFixed(3)}</div>
+      <div class="help-text">Cursor ${node.params.component} value</div>
+    </div>`;
   } else if (node.type === 'CameraInput') {
+    const currentValue = node.currentValue || 0;
+    html += `<div class="property-field">
+      <div class="property-label">Current Output</div>
+      <div class="current-value-display">${currentValue.toFixed(3)}</div>
+      <div class="help-text">Camera ${node.params.component} value</div>
+    </div>`;
     html += `<div class="property-field">
       <div class="property-label">Camera Access</div>
       <button id="enable-camera-btn-${node.id}" class="create-btn" style="width: 100%;">
@@ -4808,7 +4890,8 @@ function showNodeProperties(node) {
   }
 
   // 4. Visual Preview Section (show input/output previews)
-  if (node.category !== 'output') {
+  // Skip visual preview for control input nodes - they don't have visual output
+  if (node.category !== 'output' && node.category !== 'input') {
     html += `<div class="property-group">
       <h5><span class="section-icon">👁️</span> Visual Preview</h5>
       <div class="preview-container">`;
@@ -4883,7 +4966,7 @@ function showNodeProperties(node) {
   if (node.type === 'RangeInput') {
     const canvas = document.getElementById(`curve-preview-${node.id}`);
     if (canvas) {
-      drawCurvePreview(canvas, node.params.curve);
+      drawCurvePreview(canvas, node.params.curve, node.params.mode);
     }
   }
 
@@ -4936,10 +5019,12 @@ function showNodeProperties(node) {
       }
       
       // Update curve preview for RangeInput
-      if (node.type === 'RangeInput' && param === 'curve') {
+      if (node.type === 'RangeInput' && (param === 'curve' || param === 'mode')) {
         const canvas = document.getElementById(`curve-preview-${node.id}`);
         if (canvas) {
-          drawCurvePreview(canvas, validation.value);
+          const curveType = param === 'curve' ? validation.value : node.params.curve;
+          const mode = param === 'mode' ? validation.value : node.params.mode;
+          drawCurvePreview(canvas, curveType, mode);
         }
       }
 
@@ -5776,30 +5861,48 @@ function updateInputNodeValue(node, time) {
     case 'MIDIInput':
       const ccNum = node.params.ccNumber;
       if (controlInputs.midi[ccNum]) {
-        value = controlInputs.midi[ccNum].lastValue || 0.0;
+        const rawValue = controlInputs.midi[ccNum].lastValue || 0.0;
+        // Map to configured min/max range
+        const midiMin = node.params.min || 0;
+        const midiMax = node.params.max || 1;
+        value = midiMin + (rawValue * (midiMax - midiMin));
       }
       break;
 
     case 'AudioInput':
       if (audioEnabled && frequencyData) {
-        // Get audio level for the selected band
+        // Get audio level for the selected band (0-1)
         const band = node.params.band;
-        value = getAudioLevel(band);
+        const rawValue = getAudioLevel(band);
+        
+        // Map to configured min/max range
+        const audioMin = node.params.min || 0;
+        const audioMax = node.params.max || 1;
+        value = audioMin + (rawValue * (audioMax - audioMin));
       }
       break;
 
     case 'CursorInput':
       const component = node.params.component;
+      let rawCursorValue = 0;
       if (component === 'x') {
-        value = (mousePos.x / canvas.width);
+        rawCursorValue = (mousePos.x / canvas.width);
       } else if (component === 'y') {
-        value = (mousePos.y / canvas.height);
+        rawCursorValue = (mousePos.y / canvas.height);
       }
+      // Map to configured min/max range
+      const cursorMin = node.params.min || 0;
+      const cursorMax = node.params.max || 1;
+      value = cursorMin + (rawCursorValue * (cursorMax - cursorMin));
       break;
 
     case 'CameraInput':
       // For now, just oscillate as a demo
-      value = (Math.sin(time * 2) + 1) / 2;
+      const rawCameraValue = (Math.sin(time * 2) + 1) / 2;
+      // Map to configured min/max range
+      const cameraMin = node.params.min || 0;
+      const cameraMax = node.params.max || 1;
+      value = cameraMin + (rawCameraValue * (cameraMax - cameraMin));
       break;
 
     case 'RandomInput':
@@ -5881,13 +5984,58 @@ function updateInputNodeValue(node, time) {
           curvedProgress = (Math.sin((node.rangeProgress - 0.5) * Math.PI) + 1) / 2;
           break;
         case 'bounce':
-          curvedProgress = Math.abs(Math.sin(node.rangeProgress * Math.PI * 2));
+          // Single bounce instead of double
+          curvedProgress = Math.abs(Math.sin(node.rangeProgress * Math.PI));
           break;
         // 'linear' is default
       }
       
       // Ensure curvedProgress is always in 0-1 range
       curvedProgress = Math.max(0, Math.min(1, curvedProgress));
+      
+      // Apply round-trip mode if enabled
+      if (node.params.mode === 'round-trip') {
+        // Special handling for different curves in round-trip mode
+        switch (node.params.curve) {
+          case 'sine':
+            // Full sine wave: 0 -> 1 -> 0
+            curvedProgress = (Math.sin(node.rangeProgress * Math.PI * 2 - Math.PI/2) + 1) / 2;
+            break;
+            
+          case 'bounce':
+            // Single bounce: just use sine for smooth up and down
+            curvedProgress = Math.sin(node.rangeProgress * Math.PI);
+            break;
+            
+          case 'exponential':
+            // Exponential up, exponential down
+            if (node.rangeProgress <= 0.5) {
+              curvedProgress = Math.pow(node.rangeProgress * 2, 2);
+            } else {
+              curvedProgress = Math.pow((1 - node.rangeProgress) * 2, 2);
+            }
+            break;
+            
+          case 'logarithmic':
+            // Logarithmic up, logarithmic down
+            if (node.rangeProgress <= 0.5) {
+              const t = node.rangeProgress * 2;
+              curvedProgress = Math.log(1 + t * 9) / Math.log(10);
+            } else {
+              const t = (1 - node.rangeProgress) * 2;
+              curvedProgress = Math.log(1 + t * 9) / Math.log(10);
+            }
+            break;
+            
+          default: // linear
+            // Triangle wave: linear up, linear down
+            if (node.rangeProgress <= 0.5) {
+              curvedProgress = node.rangeProgress * 2;
+            } else {
+              curvedProgress = 2 - (node.rangeProgress * 2);
+            }
+        }
+      }
       
       // Calculate the actual value within the range
       const rangeMin = node.params.min || 0;
@@ -5903,19 +6051,39 @@ function updateInputNodeValue(node, time) {
   // Don't double-map it
   node.currentValue = value;
 
-  // Update the properties panel display if this node is selected and it's a RandomInput or RangeInput
-  if ((node.type === 'RandomInput' || node.type === 'RangeInput') && selectedNode === node) {
+  // Update the properties panel display if this node is selected
+  if (selectedNode === node && node.category === 'input') {
     const currentValueDisplay = document.querySelector('.current-value-display');
     if (currentValueDisplay) {
       currentValueDisplay.textContent = value.toFixed(3);
     }
     
-    // Also update the progress display for RangeInput
+    // Update help text for specific node types
     if (node.type === 'RangeInput') {
       const helpText = document.querySelector('.property-field .help-text');
       if (helpText && node.rangeProgress !== undefined) {
         const progressPercent = (node.rangeProgress * 100).toFixed(1);
         helpText.textContent = `Progress: ${progressPercent}% • ${node.params.loop ? 'Looping' : 'One-shot'}`;
+      }
+    } else if (node.type === 'MIDIInput') {
+      const helpText = document.querySelector('.property-field .help-text');
+      if (helpText) {
+        helpText.textContent = `MIDI CC${node.params.ccNumber} value`;
+      }
+    } else if (node.type === 'AudioInput') {
+      const helpText = document.querySelector('.property-field .help-text');
+      if (helpText) {
+        helpText.textContent = `Audio ${node.params.band} level`;
+      }
+    } else if (node.type === 'CursorInput') {
+      const helpText = document.querySelector('.property-field .help-text');
+      if (helpText) {
+        helpText.textContent = `Cursor ${node.params.component} value`;
+      }
+    } else if (node.type === 'CameraInput') {
+      const helpText = document.querySelector('.property-field .help-text');
+      if (helpText) {
+        helpText.textContent = `Camera ${node.params.component} value`;
       }
     }
   }
@@ -6850,6 +7018,16 @@ function initAudio() {
 }
 
 /**
+ * Get audio level for a specific band
+ */
+function getAudioLevel(band) {
+  if (!audioEnabled || !audioBands[band]) return 0;
+  
+  // Return the normalized value (0-1) for the requested band
+  return audioBands[band].value || 0;
+}
+
+/**
  * Analyze audio input with advanced processing
  */
 function analyzeAudio() {
@@ -6959,6 +7137,19 @@ function startColorAnalysis() {
     requestAnimationFrame(analyzeColors);
   }
   analyzeColors();
+}
+
+/**
+ * Start continuous audio analysis
+ */
+function startAudioAnalysis() {
+  function updateAudio() {
+    if (audioEnabled) {
+      analyzeAudio();
+    }
+    requestAnimationFrame(updateAudio);
+  }
+  updateAudio();
 }
 
 /**
