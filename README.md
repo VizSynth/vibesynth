@@ -1,6 +1,6 @@
-# WebGL Visual Synthesizer
+# vibesynth
 
-This project is a **web-based modular video synthesizer**. It lets you create realtime visual effects and synthesize video by patching together sources and effects in your browser. The app is implemented in JavaScript with WebGL for high-performance graphics, ensuring cross-platform compatibility (runs on modern browsers on any OS). The design takes inspiration from tools like **Hydra** (live-coded browser synth) and the **Video Synthesis Ecosphere RPI** by Andrei Jay, using multiple framebuffers to mix and chain visual outputs. The interface is analogous to analog modular synths – instead of audio, you connect **video source modules** and **effect modules** in a patch.
+vibesynth is a **web-based modular video synthesizer**. It lets you create realtime visual effects and synthesize video by patching together sources and effects in your browser. The app is implemented in JavaScript with WebGL for high-performance graphics, ensuring cross-platform compatibility (runs on modern browsers on any OS). The design takes inspiration from tools like **Hydra** (live-coded browser synth) and the **Video Synthesis Ecosphere RPI** by Andrei Jay, using multiple framebuffers to mix and chain visual outputs. The interface is analogous to analog modular synths – instead of audio, you connect **video source modules** and **effect modules** in a patch.
 
 ## Features
 

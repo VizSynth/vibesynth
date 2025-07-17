@@ -1097,7 +1097,7 @@ const colorPalettes = {
 /** Project Management System */
 let currentProject = {
   id: null,
-  name: 'Untitled Synthesis',
+  name: 'Untitled',
   description: '',
   createdAt: null,
   modifiedAt: null,
@@ -9343,7 +9343,7 @@ function deserializeProject(projectData) {
     // Restore project metadata
     currentProject = {
       id: projectData.id,
-      name: projectData.name || 'Untitled Synthesis',
+      name: projectData.name || 'Untitled',
       description: projectData.description || '',
       createdAt: projectData.createdAt,
       modifiedAt: projectData.modifiedAt,
@@ -9583,7 +9583,7 @@ function newProject() {
 
   currentProject = {
     id: null,
-    name: 'Untitled Synthesis',
+    name: 'Untitled',
     description: '',
     createdAt: null,
     modifiedAt: null,
