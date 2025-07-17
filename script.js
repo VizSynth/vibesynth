@@ -856,7 +856,7 @@ function updatePermissionUI() {
     if (node.type === 'AudioInput' && !permissions.audio.granted) {
       nodesNeedingPermissions.audio.add(node.id);
     }
-    if ((node.type === 'CameraInput' || node.type === 'Video') && !permissions.camera.granted) {
+    if (node.type === 'CameraInput' && !permissions.camera.granted) {
       nodesNeedingPermissions.camera.add(node.id);
     }
   });
@@ -916,7 +916,7 @@ function updatePermissionUI() {
     } else if (needsAudio) {
       html += 'Audio permission needed for Audio Input nodes';
     } else {
-      html += 'Camera permission needed for Camera/Video nodes';
+      html += 'Camera permission needed for Camera Input nodes';
     }
     
     html += '</div>';
@@ -956,7 +956,7 @@ function updatePermissionUI() {
   
   // Refresh node elements to update permission buttons
   nodes.forEach(node => {
-    if ((node.type === 'AudioInput' || node.type === 'CameraInput' || node.type === 'Video') && node.element) {
+    if ((node.type === 'AudioInput' || node.type === 'CameraInput') && node.element) {
       // Re-create the node element to update permission button visibility
       const oldElement = node.element;
       createNodeElement(node);
@@ -1236,9 +1236,9 @@ class SynthNode {
         icon: 'text_fields',
         category: 'source'
       },
-      VideoInput: {
+      VideoFileInput: {
         inputs: [],
-        params: { resolution: 640, fps: 30 },
+        params: { playbackRate: 1.0, loop: true },
         icon: 'video_library',
         category: 'source'
       },
@@ -1347,9 +1347,9 @@ class SynthNode {
       },
       CameraInput: {
         inputs: [],
-        params: { component: 'motionX', min: 0.0, max: 1.0 },
+        params: {},
         icon: 'videocam',
-        category: 'input'
+        category: 'source'
       },
       GameControllerInput: {
         inputs: [],
@@ -1406,7 +1406,8 @@ class SynthNode {
       // Special cases for compound names
       if (this.type === 'RadialGradient') programName = 'radialgradient';
       if (this.type === 'FlowField') programName = 'flowfield';
-      if (this.type === 'VideoInput') programName = 'videoinput';
+      if (this.type === 'VideoFileInput') programName = 'videofileinput';
+      if (this.type === 'CameraInput') programName = 'camerainput';
       if (this.type === 'NoiseDisplace') programName = 'noisedisplace';
       if (this.type === 'PolarWarp') programName = 'polarwarp';
       if (this.type === 'RGBSplit') programName = 'rgbsplit';
@@ -2450,8 +2451,11 @@ function compileShaders() {
     Logger.error('Failed to create Text shader program');
   }
 
-  // VideoInput shader - uses text shader (simple texture pass-through)
-  programs.videoinput = programs.text;
+  // VideoFileInput shader - uses text shader (simple texture pass-through)
+  programs.videofileinput = programs.text;
+  
+  // CameraInput shader - also uses text shader
+  programs.camerainput = programs.text;
 
   // Mirror shader
   const fragMirror = `
@@ -4346,10 +4350,12 @@ function createNode(type, x = 100, y = 100) {
   nodes.push(node);
 
   // Setup WebGL resources
-  if (node.type !== 'Video') {
-    allocateNodeFBO(node);
+  if (node.type === 'CameraInput') {
+    setupCameraNode(node);
+  } else if (node.type === 'VideoFileInput') {
+    setupVideoFileNode(node);
   } else {
-    setupVideoNode(node);
+    allocateNodeFBO(node);
   }
 
   // Create visual representation
@@ -4359,7 +4365,7 @@ function createNode(type, x = 100, y = 100) {
   updateExistingControlInputs(); // Update control input manager
   
   // Check if this node needs permissions
-  if (type === 'AudioInput' || type === 'CameraInput' || type === 'Video') {
+  if (type === 'AudioInput' || type === 'CameraInput') {
     updatePermissionUI();
   }
   
@@ -4400,7 +4406,7 @@ function deleteNode(node) {
   }
   
   // Update permissions UI if we deleted a node that needed permissions
-  if (node.type === 'AudioInput' || node.type === 'CameraInput' || node.type === 'Video') {
+  if (node.type === 'AudioInput' || node.type === 'CameraInput') {
     updatePermissionUI();
   }
 
@@ -4560,7 +4566,8 @@ function allocateNodeFBO(node) {
     // Special cases for compound names
     if (node.type === 'RadialGradient') programKey = 'radialgradient';
     if (node.type === 'FlowField') programKey = 'flowfield';
-    if (node.type === 'VideoInput') programKey = 'videoinput';
+    if (node.type === 'VideoFileInput') programKey = 'videofileinput';
+    if (node.type === 'CameraInput') programKey = 'camerainput';
     if (node.type === 'NoiseDisplace') programKey = 'noisedisplace';
     if (node.type === 'PolarWarp') programKey = 'polarwarp';
     if (node.type === 'RGBSplit') programKey = 'rgbsplit';
@@ -4593,11 +4600,50 @@ function setTextureParams() {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 }
 
-function setupVideoNode(node) {
-    Logger.warn('Video node setup disabled during WebGL debugging for node:', node.name);
-  // TEMPORARILY DISABLED: WebGL operations during debugging
-  node.texture = null;
-  return false;
+function setupCameraNode(node) {
+  // Create texture for webcam video
+  node.texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, node.texture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+  setTextureParams();
+  
+  // Create video element
+  node.video = document.createElement('video');
+  node.video.autoplay = true;
+  node.video.playsInline = true;
+  node.video.muted = true;
+  
+  // Setup webcam when permission is granted
+  if (cameraEnabled) {
+    enableWebcamForNode(node);
+  }
+  
+  return true;
+}
+
+function setupVideoFileNode(node) {
+  // Create texture for video file
+  node.texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, node.texture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+  setTextureParams();
+  
+  // Create video element
+  node.video = document.createElement('video');
+  node.video.autoplay = true;
+  node.video.loop = node.params.loop || true;
+  node.video.playbackRate = node.params.playbackRate || 1.0;
+  node.video.muted = true;
+  
+  return true;
+}
+
+function initCameraNode(node) {
+  setupCameraNode(node);
+}
+
+function initVideoFileNode(node) {
+  setupVideoFileNode(node);
 }
 
 /**
@@ -4656,7 +4702,7 @@ function createNodeElement(node) {
         Enable Audio
       </button>
     `;
-  } else if ((node.type === 'CameraInput' || node.type === 'Video') && !cameraEnabled && !permissions.camera.denied) {
+  } else if (node.type === 'CameraInput' && !cameraEnabled && !permissions.camera.denied) {
     permissionButton = `
       <button class="node-permission-btn" onclick="window.requestCameraPermission()" title="Enable camera access">
         <span class="material-icons">videocam</span>
@@ -6039,18 +6085,33 @@ function showNodeProperties(node) {
       <div class="help-text">Cursor ${node.params.component} value</div>
     </div>`;
   } else if (node.type === 'CameraInput') {
-    const currentValue = node.currentValue || 0;
     html += `<div class="property-field">
-      <div class="property-label">Current Output</div>
-      <div class="current-value-display">${currentValue.toFixed(3)}</div>
-      <div class="help-text">Camera ${node.params.component} value</div>
+      <div class="property-label">Camera Status</div>
+      <div class="help-text">${node.stream ? 'Webcam active' : 'No webcam connected'}</div>
     </div>`;
     html += `<div class="property-field">
       <div class="property-label">Camera Access</div>
       <button id="enable-camera-btn-${node.id}" class="create-btn" style="width: 100%;">
-        ${cameraEnabled ? 'Camera Input Active' : 'Enable Camera Input'}
+        ${node.stream ? 'Camera Input Active' : 'Enable Camera Input'}
       </button>
     </div>`;
+  } else if (node.type === 'VideoFileInput') {
+    html += `<div class="property-field">
+      <div class="property-label">Video File</div>
+      <input type="file" id="video-file-input-${node.id}" accept="video/*" style="width: 100%;">
+      ${node.videoSrc ? `<div style="font-size: 11px; color: #888; margin-top: 4px;">Current: ${node.videoSrc.split('/').pop()}</div>` : ''}
+    </div>`;
+    if (node.video) {
+      html += `<div class="property-field">
+        <div class="property-label">Playback Controls</div>
+        <div style="display: flex; gap: 10px;">
+          <button id="play-btn-${node.id}" class="create-btn" style="flex: 1;">
+            ${node.video.paused ? 'Play' : 'Pause'}
+          </button>
+          <button id="stop-btn-${node.id}" class="create-btn" style="flex: 1;">Stop</button>
+        </div>
+      </div>`;
+    }
   } else if (node.type === 'GameControllerInput') {
     const controllerComponent = node.params.component || 'button0';
     const currentValue = node.currentValue || 0;
@@ -6605,37 +6666,68 @@ function showNodeProperties(node) {
   const cameraBtn = panel.querySelector(`#enable-camera-btn-${node.id}`);
   if (cameraBtn) {
     cameraBtn.addEventListener('click', async () => {
-      if (!cameraEnabled) {
+      if (!node.stream) {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: 320, height: 240 } // Low resolution for analysis
-          });
-
-          // Create hidden video element
-          cameraVideoElement = document.createElement('video');
-          cameraVideoElement.srcObject = stream;
-          cameraVideoElement.play();
-          cameraVideoElement.style.display = 'none';
-          document.body.appendChild(cameraVideoElement);
-
-          // Create canvas for frame analysis
-          cameraCanvas = document.createElement('canvas');
-          cameraCanvas.width = 320;
-          cameraCanvas.height = 240;
-          cameraContext = cameraCanvas.getContext('2d');
-
-          cameraEnabled = true;
+          await enableWebcamForNode(node);
           cameraBtn.textContent = 'Camera Input Active';
           cameraBtn.disabled = true;
           cameraBtn.style.background = '#10b981';
-
-          Logger.info('Camera input enabled via node properties');
         } catch (error) {
-          Logger.error('Camera access error:', error);
           cameraBtn.textContent = 'Camera Access Denied';
           cameraBtn.style.background = '#ef4444';
         }
       }
+    });
+  }
+  
+  // Add video file input event listener
+  const videoFileInput = panel.querySelector(`#video-file-input-${node.id}`);
+  if (videoFileInput) {
+    videoFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (file && file.type.startsWith('video/')) {
+        const url = URL.createObjectURL(file);
+        node.videoSrc = file.name;
+        
+        if (node.video) {
+          node.video.src = url;
+          node.video.load();
+          node.video.play();
+          
+          // Update the display to show current file
+          const fileDisplay = panel.querySelector(`#video-file-input-${node.id} + div`);
+          if (fileDisplay) {
+            fileDisplay.textContent = `Current: ${file.name}`;
+          }
+          
+          markUnsaved();
+          saveState('Load video file');
+        }
+      }
+    });
+  }
+  
+  // Add video playback control event listeners
+  const playBtn = panel.querySelector(`#play-btn-${node.id}`);
+  if (playBtn && node.video) {
+    playBtn.addEventListener('click', () => {
+      if (node.video.paused) {
+        node.video.play();
+        playBtn.textContent = 'Pause';
+      } else {
+        node.video.pause();
+        playBtn.textContent = 'Play';
+      }
+    });
+  }
+  
+  const stopBtn = panel.querySelector(`#stop-btn-${node.id}`);
+  if (stopBtn && node.video) {
+    stopBtn.addEventListener('click', () => {
+      node.video.pause();
+      node.video.currentTime = 0;
+      const playBtn = panel.querySelector(`#play-btn-${node.id}`);
+      if (playBtn) playBtn.textContent = 'Play';
     });
   }
   
@@ -7652,7 +7744,21 @@ function renderNode(node, time) {
     }
   }
 
-  if (node.type === 'Video') {
+  if (node.type === 'CameraInput') {
+    if (node.video && node.video.readyState === node.video.HAVE_ENOUGH_DATA) {
+      gl.bindTexture(gl.TEXTURE_2D, node.texture);
+      try {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, node.video);
+        setTextureParams();
+      } catch(e) {
+        // Handle video texture errors
+      }
+    }
+    return;
+  }
+  
+  // Handle VideoFileInput node - upload video frame as texture
+  if (node.type === 'VideoFileInput') {
     if (node.video && node.video.readyState === node.video.HAVE_ENOUGH_DATA) {
       gl.bindTexture(gl.TEXTURE_2D, node.texture);
       try {
@@ -9563,6 +9669,36 @@ async function enableCameraInput() {
 }
 
 /**
+ * Enable webcam for a specific camera node
+ */
+async function enableWebcamForNode(node) {
+  if (!node.video) return;
+  
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { 
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    });
+    
+    node.video.srcObject = stream;
+    node.stream = stream;
+    
+    // Update permissions
+    permissions.camera.granted = true;
+    permissions.camera.requested = true;
+    updatePermissionUI();
+    
+    Logger.info(`Webcam enabled for node: ${node.name}`);
+  } catch (error) {
+    Logger.error(`Failed to enable webcam for node ${node.name}:`, error);
+    permissions.camera.denied = true;
+    updatePermissionUI();
+  }
+}
+
+/**
  * Start camera analysis
  */
 function startCameraAnalysis() {
@@ -10031,8 +10167,10 @@ function deserializeProject(projectData) {
         node.groupName = nodeData.groupName;
 
         // Initialize node (create textures, programs, etc.)
-        if (node.type === 'Video') {
-          initVideoNode(node);
+        if (node.type === 'CameraInput') {
+          initCameraNode(node);
+        } else if (node.type === 'VideoFileInput') {
+          initVideoFileNode(node);
         } else {
           allocateNodeFBO(node);
         }
