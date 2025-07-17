@@ -951,7 +951,7 @@ function updatePermissionUI() {
   
   // Update node UI elements if properties panel is open
   if (selectedNode) {
-    updatePropertiesPanel(selectedNode);
+    showNodeProperties(selectedNode);
   }
   
   // Refresh node elements to update permission buttons
@@ -6406,7 +6406,7 @@ function showNodeProperties(node) {
                 }
                 
                 // Update the properties panel to show the detected controller
-                updatePropertiesPanel(node);
+                showNodeProperties(node);
                 break;
               }
             }
@@ -9461,7 +9461,7 @@ function updateGamepadStatus() {
   
   // Update properties panel if a GameControllerInput node is selected
   if (selectedNode && selectedNode.type === 'GameControllerInput') {
-    updatePropertiesPanel(selectedNode);
+    showNodeProperties(selectedNode);
   }
   
   // Update permission UI if needed
