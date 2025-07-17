@@ -2446,9 +2446,12 @@ function compileShaders() {
     }
   `;
   programs.text = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragText));
+  if (!programs.text) {
+    Logger.error('Failed to create Text shader program');
+  }
 
-  // VideoInput shader - same as Video
-  programs.videoinput = programs.video;
+  // VideoInput shader - uses text shader (simple texture pass-through)
+  programs.videoinput = programs.text;
 
   // Mirror shader
   const fragMirror = `
@@ -4565,8 +4568,9 @@ function allocateNodeFBO(node) {
     
     if (programs[programKey]) {
       node.program = programs[programKey];
+      Logger.debug(`Assigned program '${programKey}' to node ${node.name} (${node.type})`);
     } else {
-      Logger.warn(`No shader program found for node type: ${node.type}, using fallback`);
+      Logger.warn(`No shader program found for node type: ${node.type} (key: ${programKey}), using fallback`);
       // Use copy shader as fallback for input nodes
       if (node.category === 'input' && programs.copy) {
         node.program = programs.copy;
@@ -7880,7 +7884,17 @@ function renderNode(node, time) {
   // Check for errors after drawing
   error = gl.getError();
   if (error !== gl.NO_ERROR) {
-    Logger.error(`WebGL error after rendering ${node.name}:`, error);
+    const errorName = error === 1282 ? 'GL_INVALID_OPERATION' : 
+                     error === 1281 ? 'GL_INVALID_VALUE' :
+                     error === 1280 ? 'GL_INVALID_ENUM' : `Unknown (${error})`;
+    Logger.error(`WebGL error after rendering ${node.name} (${node.type}): ${errorName}`);
+    
+    // Additional debug info for GL_INVALID_OPERATION
+    if (error === 1282) {
+      Logger.debug(`  Program valid: ${!!node.program}`);
+      Logger.debug(`  Texture valid: ${!!node.texture && gl.isTexture(node.texture)}`);
+      Logger.debug(`  FBO valid: ${!!node.fbo && gl.isFramebuffer(node.fbo)}`);
+    }
   }
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
