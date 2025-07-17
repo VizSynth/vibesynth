@@ -2354,8 +2354,8 @@ function compileShaders() {
     precision mediump float;
     uniform float u_time;
     uniform vec2 u_resolution;
-    uniform float u_fieldScale;
-    uniform float u_timeWarp;
+    uniform float u_fieldscale;
+    uniform float u_timewarp;
     varying vec2 v_uv;
     
     vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -2385,15 +2385,38 @@ function compileShaders() {
     }
     
     void main() {
-      vec2 uv = v_uv * u_fieldScale;
-      float t = u_time * u_timeWarp;
+      vec2 uv = v_uv * u_fieldscale;
+      float t = u_time * u_timewarp;
       
-      float n1 = snoise(uv + vec2(t * 0.1, t * 0.15));
-      float n2 = snoise(uv * 2.0 - vec2(t * 0.05, t * 0.1));
+      // Multiple octaves for richer flow
+      float n1 = 0.0;
+      float n2 = 0.0;
+      float amp = 1.0;
+      float freq = 1.0;
       
-      vec2 flow = vec2(n1, n2) * 0.5 + 0.5;
+      for (int i = 0; i < 3; i++) {
+        n1 += amp * snoise(uv * freq + vec2(t * 0.1, t * 0.15));
+        n2 += amp * snoise(uv * freq * 1.5 - vec2(t * 0.05, t * 0.1));
+        amp *= 0.5;
+        freq *= 2.0;
+      }
       
-      vec3 color = vec3(flow.x, flow.y, 0.5 + 0.5 * sin(t));
+      // Create flow direction from noise
+      vec2 flow = vec2(n1, n2);
+      float flowMag = length(flow);
+      
+      // Convert to angle for hue
+      float angle = atan(flow.y, flow.x);
+      float hue = (angle + 3.14159) / (2.0 * 3.14159);
+      
+      // HSV to RGB conversion
+      vec3 c = vec3(hue, 0.8, 0.9);
+      vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+      vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+      vec3 color = c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+      
+      // Add some brightness variation based on magnitude
+      color *= 0.7 + 0.3 * flowMag;
       
       gl_FragColor = vec4(color, 1.0);
     }
