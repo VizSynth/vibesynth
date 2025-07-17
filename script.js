@@ -4552,7 +4552,17 @@ function allocateNodeFBO(node) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     // Assign shader program
-    const programKey = node.type.toLowerCase();
+    let programKey = node.type.toLowerCase();
+    
+    // Special cases for compound names
+    if (node.type === 'RadialGradient') programKey = 'radialgradient';
+    if (node.type === 'FlowField') programKey = 'flowfield';
+    if (node.type === 'VideoInput') programKey = 'videoinput';
+    if (node.type === 'NoiseDisplace') programKey = 'noisedisplace';
+    if (node.type === 'PolarWarp') programKey = 'polarwarp';
+    if (node.type === 'RGBSplit') programKey = 'rgbsplit';
+    if (node.type === 'FeedbackTrail') programKey = 'feedbacktrail';
+    
     if (programs[programKey]) {
       node.program = programs[programKey];
     } else {
@@ -7879,8 +7889,17 @@ function renderNode(node, time) {
   if (node.type === 'FeedbackTrail') {
     // Ensure feedback buffer exists
     if (!node.feedbackTexture) {
-      node.feedbackTexture = createTexture();
-      node.feedbackFbo = createFramebuffer(node.feedbackTexture);
+      // Create feedback texture
+      node.feedbackTexture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, node.feedbackTexture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      setTextureParams();
+      
+      // Create feedback framebuffer
+      node.feedbackFbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, node.feedbackFbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, node.feedbackTexture, 0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
     
     // Swap buffers: current output becomes next frame's feedback
@@ -8131,8 +8150,17 @@ function setNodeUniforms(node) {
   if (node.type === 'FeedbackTrail') {
     // Feedback trail needs special texture handling in render loop
     if (!node.feedbackTexture) {
-      node.feedbackTexture = createTexture();
-      node.feedbackFbo = createFramebuffer(node.feedbackTexture);
+      // Create feedback texture
+      node.feedbackTexture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, node.feedbackTexture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      setTextureParams();
+      
+      // Create feedback framebuffer
+      node.feedbackFbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, node.feedbackFbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, node.feedbackTexture, 0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
   }
 
