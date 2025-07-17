@@ -69,6 +69,30 @@ const PARAMETER_CONSTRAINTS = {
   scaleY: { type: 'number', min: 0, max: 3, step: 0.01, default: 1.0 },
   slices: { type: 'integer', min: 1, max: 12, step: 1, default: 6 },
   offset: { type: 'number', min: 0, max: 1, step: 0.01, default: 0.5 },
+  
+  // New source node parameters
+  octaves: { type: 'integer', min: 1, max: 8, step: 1, default: 5 },
+  lacunarity: { type: 'number', min: 1, max: 4, step: 0.1, default: 2.1 },
+  gain: { type: 'number', min: 0, max: 1, step: 0.01, default: 0.5 },
+  speed: { type: 'number', min: 0, max: 1, step: 0.01, default: 0.08 },
+  scale: { type: 'number', min: 1, max: 20, step: 0.1, default: 6 },
+  exponent: { type: 'number', min: 0.1, max: 5, step: 0.1, default: 1.6 },
+  fieldScale: { type: 'number', min: 0.1, max: 5, step: 0.1, default: 1.7 },
+  timeWarp: { type: 'number', min: 0, max: 2, step: 0.01, default: 0.4 },
+  resolution: { type: 'integer', min: 240, max: 1920, step: 80, default: 640 },
+  fps: { type: 'integer', min: 15, max: 60, step: 5, default: 30 },
+  
+  // New effect node parameters
+  mode: { type: 'string', values: ['horizontal', 'vertical', 'radial'], default: 'radial' },
+  sides: { type: 'integer', min: 2, max: 16, step: 1, default: 6 },
+  amplitude: { type: 'number', min: 0, max: 0.5, step: 0.01, default: 0.08 },
+  innerRadius: { type: 'number', min: 0, max: 1, step: 0.01, default: 0.1 },
+  twist: { type: 'number', min: -3, max: 3, step: 0.1, default: 0.3 },
+  falloff: { type: 'number', min: 0, max: 2, step: 0.01, default: 0.85 },
+  decay: { type: 'number', min: 0, max: 1, step: 0.01, default: 0.92 },
+  blur: { type: 'number', min: 0, max: 10, step: 0.1, default: 2 },
+  threshold: { type: 'number', min: 0, max: 1, step: 0.01, default: 0.75 },
+  strength: { type: 'number', min: 0, max: 3, step: 0.1, default: 1.2 },
 
   // Random node parameters
   interval: { type: 'number', min: 0.01, max: 10, step: 0.01, default: 0.1 },
@@ -1177,6 +1201,47 @@ class SynthNode {
         icon: 'videocam',
         category: 'video'
       },
+      // New source nodes
+      Plasma: {
+        inputs: [],
+        controlInputs: [null, null, null, null], // octaves, lacunarity, gain, speed
+        params: { octaves: 5, lacunarity: 2.1, gain: 0.5, speed: 0.08 },
+        icon: 'water',
+        category: 'source'
+      },
+      Voronoi: {
+        inputs: [],
+        controlInputs: [null, null], // scale, speed
+        params: { scale: 6, speed: 0.2 },
+        icon: 'hexagon',
+        category: 'source'
+      },
+      RadialGradient: {
+        inputs: [],
+        controlInputs: [null], // exponent
+        params: { innerColor: '#ffe8d9', outerColor: '#292929', exponent: 1.6 },
+        icon: 'lens',
+        category: 'source'
+      },
+      FlowField: {
+        inputs: [],
+        controlInputs: [null, null], // fieldScale, timeWarp
+        params: { fieldScale: 1.7, timeWarp: 0.4 },
+        icon: 'air',
+        category: 'source'
+      },
+      Text: {
+        inputs: [],
+        params: { text: 'Hello', font: 'Inter Bold 96pt', fillColor: '#ffffff' },
+        icon: 'text_fields',
+        category: 'source'
+      },
+      VideoInput: {
+        inputs: [],
+        params: { resolution: 640, fps: 30 },
+        icon: 'video_library',
+        category: 'source'
+      },
       Transform: {
         inputs: [null], // Main input
         controlInputs: [null, null, null, null, null, null], // positionX, positionY, scaleX, scaleY, rotation, opacity
@@ -1196,6 +1261,49 @@ class SynthNode {
         controlInputs: [null], // slices
         params: { slices: 6.0 },
         icon: 'auto_fix_high',
+        category: 'effect'
+      },
+      // New transform/post-fx nodes
+      Mirror: {
+        inputs: [null],
+        controlInputs: [null], // sides (for radial mode)
+        params: { mode: 'radial', sides: 6 },
+        icon: 'flip',
+        category: 'effect'
+      },
+      NoiseDisplace: {
+        inputs: [null],
+        controlInputs: [null, null], // amplitude, frequency
+        params: { amplitude: 0.08, frequency: 2.5 },
+        icon: 'blur_on',
+        category: 'effect'
+      },
+      PolarWarp: {
+        inputs: [null],
+        controlInputs: [null, null], // innerRadius, twist
+        params: { innerRadius: 0.1, twist: 0.3 },
+        icon: 'panorama_fish_eye',
+        category: 'effect'
+      },
+      RGBSplit: {
+        inputs: [null],
+        controlInputs: [null, null], // offset, falloff
+        params: { offset: 3, falloff: 0.85 },
+        icon: 'blur_linear',
+        category: 'effect'
+      },
+      FeedbackTrail: {
+        inputs: [null],
+        controlInputs: [null, null], // decay, blur
+        params: { decay: 0.92, blur: 2 },
+        icon: 'motion_blur',
+        category: 'effect'
+      },
+      Bloom: {
+        inputs: [null],
+        controlInputs: [null, null, null], // threshold, strength, radius
+        params: { threshold: 0.75, strength: 1.2, radius: 0.4 },
+        icon: 'flare',
         category: 'effect'
       },
       Mix: {
@@ -2126,6 +2234,363 @@ function compileShaders() {
   } else {
     Logger.info('Composite shader compiled successfully');
   }
+
+  // Plasma shader - fBm-based plasma effect
+  const fragPlasma = `
+    precision mediump float;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform float u_octaves;
+    uniform float u_lacunarity;
+    uniform float u_gain;
+    uniform float u_speed;
+    varying vec2 v_uv;
+    
+    float noise(vec2 p) {
+      return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+    }
+    
+    float fbm(vec2 p) {
+      float value = 0.0;
+      float amplitude = 0.5;
+      float frequency = 1.0;
+      
+      for (int i = 0; i < 8; i++) {
+        if (float(i) >= u_octaves) break;
+        value += amplitude * noise(p * frequency);
+        frequency *= u_lacunarity;
+        amplitude *= u_gain;
+      }
+      return value;
+    }
+    
+    void main() {
+      vec2 uv = v_uv * 2.0 - 1.0;
+      float t = u_time * u_speed;
+      
+      float n1 = fbm(uv * 3.0 + vec2(t * 0.5, t * 0.3));
+      float n2 = fbm(uv * 4.0 - vec2(t * 0.3, t * 0.5));
+      float n3 = fbm(uv * 5.0 + vec2(t * 0.2, -t * 0.4));
+      
+      vec3 color = vec3(
+        0.5 + 0.5 * sin(n1 * 6.28 + t),
+        0.5 + 0.5 * sin(n2 * 6.28 + t + 2.094),
+        0.5 + 0.5 * sin(n3 * 6.28 + t + 4.188)
+      );
+      
+      // Pastel palette
+      color = mix(color, vec3(0.9, 0.8, 0.85), 0.3);
+      
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+  programs.plasma = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragPlasma));
+
+  // Voronoi shader - Worley noise cells
+  const fragVoronoi = `
+    precision mediump float;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform float u_scale;
+    uniform float u_speed;
+    varying vec2 v_uv;
+    
+    vec2 random2(vec2 p) {
+      return fract(sin(vec2(
+        dot(p, vec2(127.1, 311.7)),
+        dot(p, vec2(269.5, 183.3))
+      )) * 43758.5453);
+    }
+    
+    void main() {
+      vec2 uv = v_uv * u_scale;
+      vec2 iuv = floor(uv);
+      vec2 fuv = fract(uv);
+      
+      float minDist = 1.0;
+      
+      for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+          vec2 neighbor = vec2(float(x), float(y));
+          vec2 point = random2(iuv + neighbor);
+          point = 0.5 + 0.5 * sin(u_time * u_speed + 6.2831 * point);
+          vec2 diff = neighbor + point - fuv;
+          float dist = length(diff);
+          minDist = min(minDist, dist);
+        }
+      }
+      
+      vec3 color = vec3(minDist);
+      color = 1.0 - color;
+      color *= vec3(0.9, 0.85, 1.0);
+      
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+  programs.voronoi = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragVoronoi));
+
+  // Radial Gradient shader
+  const fragRadialGradient = `
+    precision mediump float;
+    uniform vec3 u_innerColor;
+    uniform vec3 u_outerColor;
+    uniform float u_exponent;
+    varying vec2 v_uv;
+    
+    void main() {
+      vec2 center = v_uv - 0.5;
+      float dist = length(center) * 2.0;
+      dist = pow(dist, u_exponent);
+      dist = clamp(dist, 0.0, 1.0);
+      
+      vec3 color = mix(u_innerColor, u_outerColor, dist);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+  programs.radialgradient = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragRadialGradient));
+
+  // Flow Field shader - curl noise flow field
+  const fragFlowField = `
+    precision mediump float;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform float u_fieldScale;
+    uniform float u_timeWarp;
+    varying vec2 v_uv;
+    
+    vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+    vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+    vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
+    
+    float snoise(vec2 v) {
+      const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+      vec2 i = floor(v + dot(v, C.yy));
+      vec2 x0 = v - i + dot(i, C.xx);
+      vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+      vec4 x12 = x0.xyxy + C.xxzz;
+      x12.xy -= i1;
+      i = mod289(i);
+      vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+      vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+      m = m*m; m = m*m;
+      vec3 x = 2.0 * fract(p * C.www) - 1.0;
+      vec3 h = abs(x) - 0.5;
+      vec3 ox = floor(x + 0.5);
+      vec3 a0 = x - ox;
+      m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+      vec3 g;
+      g.x = a0.x * x0.x + h.x * x0.y;
+      g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+      return 130.0 * dot(m, g);
+    }
+    
+    void main() {
+      vec2 uv = v_uv * u_fieldScale;
+      float t = u_time * u_timeWarp;
+      
+      float n1 = snoise(uv + vec2(t * 0.1, t * 0.15));
+      float n2 = snoise(uv * 2.0 - vec2(t * 0.05, t * 0.1));
+      
+      vec2 flow = vec2(n1, n2) * 0.5 + 0.5;
+      
+      vec3 color = vec3(flow.x, flow.y, 0.5 + 0.5 * sin(t));
+      
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+  programs.flowfield = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragFlowField));
+
+  // Text shader - solid color (actual text rendering happens in canvas)
+  const fragText = `
+    precision mediump float;
+    uniform sampler2D u_texture;
+    varying vec2 v_uv;
+    
+    void main() {
+      gl_FragColor = texture2D(u_texture, v_uv);
+    }
+  `;
+  programs.text = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragText));
+
+  // VideoInput shader - same as Video
+  programs.videoinput = programs.video;
+
+  // Mirror shader
+  const fragMirror = `
+    precision mediump float;
+    uniform sampler2D u_texture;
+    uniform float u_mode; // 0: horizontal, 1: vertical, 2: radial
+    uniform float u_sides;
+    varying vec2 v_uv;
+    
+    void main() {
+      vec2 uv = v_uv;
+      
+      if (u_mode < 0.5) {
+        // Horizontal mirror
+        uv.x = uv.x < 0.5 ? uv.x : 1.0 - uv.x;
+      } else if (u_mode < 1.5) {
+        // Vertical mirror
+        uv.y = uv.y < 0.5 ? uv.y : 1.0 - uv.y;
+      } else {
+        // Radial mirror
+        vec2 center = uv - 0.5;
+        float angle = atan(center.y, center.x);
+        float radius = length(center);
+        float segmentAngle = 6.28318 / u_sides;
+        angle = mod(angle, segmentAngle);
+        if (angle > segmentAngle * 0.5) {
+          angle = segmentAngle - angle;
+        }
+        uv = vec2(cos(angle), sin(angle)) * radius + 0.5;
+      }
+      
+      gl_FragColor = texture2D(u_texture, uv);
+    }
+  `;
+  programs.mirror = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragMirror));
+
+  // Noise Displace shader
+  const fragNoiseDisplace = `
+    precision mediump float;
+    uniform sampler2D u_texture;
+    uniform float u_time;
+    uniform float u_amplitude;
+    uniform float u_frequency;
+    varying vec2 v_uv;
+    
+    float noise(vec2 p) {
+      return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+    }
+    
+    void main() {
+      vec2 uv = v_uv;
+      vec2 offset = vec2(
+        noise(uv * u_frequency + u_time) - 0.5,
+        noise(uv * u_frequency + u_time + 100.0) - 0.5
+      ) * u_amplitude;
+      
+      uv += offset;
+      gl_FragColor = texture2D(u_texture, uv);
+    }
+  `;
+  programs.noisedisplace = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragNoiseDisplace));
+
+  // Polar Warp shader
+  const fragPolarWarp = `
+    precision mediump float;
+    uniform sampler2D u_texture;
+    uniform float u_innerRadius;
+    uniform float u_twist;
+    varying vec2 v_uv;
+    
+    void main() {
+      vec2 center = v_uv - 0.5;
+      float radius = length(center);
+      float angle = atan(center.y, center.x);
+      
+      radius = mix(u_innerRadius, radius, radius);
+      angle += u_twist * (1.0 - radius);
+      
+      vec2 uv = vec2(cos(angle), sin(angle)) * radius + 0.5;
+      gl_FragColor = texture2D(u_texture, uv);
+    }
+  `;
+  programs.polarwarp = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragPolarWarp));
+
+  // RGB Split shader
+  const fragRGBSplit = `
+    precision mediump float;
+    uniform sampler2D u_texture;
+    uniform float u_offset;
+    uniform float u_falloff;
+    varying vec2 v_uv;
+    
+    void main() {
+      vec2 center = v_uv - 0.5;
+      float dist = length(center);
+      float offset = u_offset * 0.01 * pow(dist, u_falloff);
+      
+      vec2 dir = normalize(center);
+      vec2 rOffset = dir * offset;
+      vec2 bOffset = -dir * offset;
+      
+      float r = texture2D(u_texture, v_uv + rOffset).r;
+      float g = texture2D(u_texture, v_uv).g;
+      float b = texture2D(u_texture, v_uv + bOffset).b;
+      
+      gl_FragColor = vec4(r, g, b, 1.0);
+    }
+  `;
+  programs.rgbsplit = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragRGBSplit));
+
+  // Feedback Trail shader
+  const fragFeedbackTrail = `
+    precision mediump float;
+    uniform sampler2D u_texture;
+    uniform sampler2D u_feedbackTexture;
+    uniform float u_decay;
+    uniform float u_blur;
+    varying vec2 v_uv;
+    
+    void main() {
+      vec4 current = texture2D(u_texture, v_uv);
+      
+      // Sample feedback with slight blur
+      vec4 feedback = vec4(0.0);
+      float blurSize = u_blur * 0.002;
+      for (float x = -1.0; x <= 1.0; x += 1.0) {
+        for (float y = -1.0; y <= 1.0; y += 1.0) {
+          vec2 offset = vec2(x, y) * blurSize;
+          feedback += texture2D(u_feedbackTexture, v_uv + offset);
+        }
+      }
+      feedback /= 9.0;
+      
+      feedback *= u_decay;
+      
+      gl_FragColor = max(current, feedback);
+    }
+  `;
+  programs.feedbacktrail = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragFeedbackTrail));
+
+  // Bloom shader - simplified bloom effect
+  const fragBloom = `
+    precision mediump float;
+    uniform sampler2D u_texture;
+    uniform float u_threshold;
+    uniform float u_strength;
+    uniform float u_radius;
+    varying vec2 v_uv;
+    
+    void main() {
+      vec4 color = texture2D(u_texture, v_uv);
+      
+      // Extract bright areas
+      float brightness = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+      vec4 bright = color * smoothstep(u_threshold - 0.1, u_threshold, brightness);
+      
+      // Blur bright areas
+      vec4 blur = vec4(0.0);
+      float total = 0.0;
+      float rad = u_radius * 0.01;
+      
+      for (float x = -2.0; x <= 2.0; x += 1.0) {
+        for (float y = -2.0; y <= 2.0; y += 1.0) {
+          vec2 offset = vec2(x, y) * rad;
+          float weight = 1.0 - length(vec2(x, y)) / 3.0;
+          vec4 sample = texture2D(u_texture, v_uv + offset);
+          float sampleBright = dot(sample.rgb, vec3(0.299, 0.587, 0.114));
+          blur += sample * smoothstep(u_threshold - 0.1, u_threshold, sampleBright) * weight;
+          total += weight;
+        }
+      }
+      blur /= total;
+      
+      gl_FragColor = color + blur * u_strength;
+    }
+  `;
+  programs.bloom = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragBloom));
 
   // Copy shader - simple texture passthrough
   const fragCopy = `
@@ -7150,6 +7615,39 @@ function renderNode(node, time) {
     }
     return;
   }
+  
+  // Handle Text node - render text to canvas then upload as texture
+  if (node.type === 'Text') {
+    if (!node.textCanvas) {
+      node.textCanvas = document.createElement('canvas');
+      node.textCanvas.width = canvas.width;
+      node.textCanvas.height = canvas.height;
+      node.textCtx = node.textCanvas.getContext('2d');
+    }
+    
+    // Clear canvas
+    node.textCtx.clearRect(0, 0, node.textCanvas.width, node.textCanvas.height);
+    
+    // Set text properties
+    node.textCtx.font = node.params.font || 'Inter Bold 96pt';
+    node.textCtx.fillStyle = node.params.fillColor || '#ffffff';
+    node.textCtx.textAlign = 'center';
+    node.textCtx.textBaseline = 'middle';
+    
+    // Draw text
+    node.textCtx.fillText(
+      node.params.text || 'Hello',
+      node.textCanvas.width / 2,
+      node.textCanvas.height / 2
+    );
+    
+    // Upload canvas to texture
+    gl.bindTexture(gl.TEXTURE_2D, node.texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, node.textCanvas);
+    setTextureParams();
+    
+    // Don't return - let it render normally with the texture
+  }
 
   // Handle input nodes - they just update values and don't render
   if (node.category === 'input') {
@@ -7341,6 +7839,31 @@ function renderNode(node, time) {
   }
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  
+  // Special post-processing for FeedbackTrail
+  if (node.type === 'FeedbackTrail') {
+    // Copy current output to feedback buffer
+    gl.bindFramebuffer(gl.FRAMEBUFFER, node.feedbackFbo);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    
+    gl.useProgram(programs.copy);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, node.texture);
+    const texLoc = gl.getUniformLocation(programs.copy, 'u_texture');
+    if (texLoc) gl.uniform1i(texLoc, 0);
+    
+    bindQuad();
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, quadBuffer.numItems);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    
+    // Set feedback texture uniform for next frame
+    const feedbackLoc = gl.getUniformLocation(node.program, 'u_feedbackTexture');
+    if (feedbackLoc) {
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, node.feedbackTexture);
+      gl.uniform1i(feedbackLoc, 1);
+    }
+  }
 }
 
 /**
@@ -7532,6 +8055,59 @@ function setNodeUniforms(node) {
       }
     }
   });
+
+  // Special handling for new nodes with color parameters
+  if (node.type === 'RadialGradient') {
+    // Inner color
+    const innerColorHex = node.params.innerColor.replace('#', '');
+    const innerR = parseInt(innerColorHex.substr(0, 2), 16) / 255;
+    const innerG = parseInt(innerColorHex.substr(2, 2), 16) / 255;
+    const innerB = parseInt(innerColorHex.substr(4, 2), 16) / 255;
+    const innerLoc = gl.getUniformLocation(program, 'u_innerColor');
+    if (innerLoc) {
+      gl.uniform3f(innerLoc, innerR, innerG, innerB);
+    }
+    
+    // Outer color
+    const outerColorHex = node.params.outerColor.replace('#', '');
+    const outerR = parseInt(outerColorHex.substr(0, 2), 16) / 255;
+    const outerG = parseInt(outerColorHex.substr(2, 2), 16) / 255;
+    const outerB = parseInt(outerColorHex.substr(4, 2), 16) / 255;
+    const outerLoc = gl.getUniformLocation(program, 'u_outerColor');
+    if (outerLoc) {
+      gl.uniform3f(outerLoc, outerR, outerG, outerB);
+    }
+  }
+  
+  if (node.type === 'Text') {
+    // Fill color
+    const fillColorHex = node.params.fillColor.replace('#', '');
+    const fillR = parseInt(fillColorHex.substr(0, 2), 16) / 255;
+    const fillG = parseInt(fillColorHex.substr(2, 2), 16) / 255;
+    const fillB = parseInt(fillColorHex.substr(4, 2), 16) / 255;
+    const fillLoc = gl.getUniformLocation(program, 'u_fillColor');
+    if (fillLoc) {
+      gl.uniform3f(fillLoc, fillR, fillG, fillB);
+    }
+  }
+  
+  if (node.type === 'Mirror') {
+    // Convert mode string to numeric value
+    const modeValue = node.params.mode === 'horizontal' ? 0 : 
+                      node.params.mode === 'vertical' ? 1 : 2; // radial
+    const modeLoc = gl.getUniformLocation(program, 'u_mode');
+    if (modeLoc) {
+      gl.uniform1f(modeLoc, modeValue);
+    }
+  }
+  
+  if (node.type === 'FeedbackTrail') {
+    // Feedback trail needs special texture handling in render loop
+    if (!node.feedbackTexture) {
+      node.feedbackTexture = createTexture();
+      node.feedbackFbo = createFramebuffer(node.feedbackTexture);
+    }
+  }
 
   // Special handling for Transform node vec2 uniforms
   if (node.type === 'Transform') {

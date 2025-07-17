@@ -27,11 +27,25 @@ vibesynth is a **web-based modular video synthesizer**. It lets you create realt
 - **Noise:** Generates a pseudo-random noise texture.
 - **Shape:** Draws a basic shape (default is a circle) with adjustable size and softness.
 - **Video:** Captures your webcam video as a texture (you'll be prompted for camera permission).
+- **Plasma:** Creates beautiful fBm-based plasma effects with pastel colors.
+- **Voronoi:** Generates Worley noise cellular patterns.
+- **Radial Gradient:** Creates smooth radial gradient fills.
+- **Flow Field:** Produces curl noise flow field animations.
+- **Text:** Renders custom text as a texture source.
+- **Video File:** Loads and plays video files as texture input.
 
 *Effect Modules:*
 - **Transform:** Position, scale, rotate, and adjust opacity of any input source.
 - **ColorAdjust:** Adjusts brightness/contrast/saturation and can invert colors of an input.
 - **Kaleidoscope:** Applies a kaleidoscopic symmetry effect to an input (adjust slices count).
+
+*Beauty Effects:*
+- **Mirror:** Creates horizontal, vertical, or radial mirror reflections.
+- **Noise Displace:** Applies Perlin noise-based displacement warping.
+- **Polar Warp:** Transforms Cartesian coordinates to polar with twist effects.
+- **RGB Split:** Creates chromatic aberration by splitting color channels.
+- **Feedback Trail:** Generates motion trails with decay and blur.
+- **Bloom:** Adds a beautiful glow effect to bright areas.
 
 *Compositing Modules:*
 - **Mix:** Simple crossfade blend between two sources with a mix factor.
