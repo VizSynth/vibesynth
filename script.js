@@ -7813,58 +7813,44 @@ function renderNode(node, time) {
     }
   }
 
-  if (node.type === 'Camera') {
-    if (node.video && node.video.readyState === node.video.HAVE_ENOUGH_DATA) {
+  if (node.type === 'Camera' || node.type === 'VideoFileInput') {
+    if (node.video && node.video.readyState === node.video.HAVE_ENOUGH_DATA && node.texture) {
+      // Validate texture before use
+      if (!gl.isTexture(node.texture)) {
+        Logger.error(`${node.type} node ${node.name} has invalid texture`);
+        return;
+      }
+      
+      // Save current texture binding
+      const currentTexture = gl.getParameter(gl.TEXTURE_BINDING_2D);
+      
       // Update the node's texture with the current video frame
       gl.bindTexture(gl.TEXTURE_2D, node.texture);
       try {
+        // Clear any pending errors
+        gl.getError();
+        
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, node.video);
         setTextureParams();
+        
+        // Check for errors
+        const error = gl.getError();
+        if (error !== gl.NO_ERROR) {
+          Logger.error(`${node.type} texture upload error:`, error);
+        }
       } catch(e) {
         // Handle video texture errors
-        Logger.error('Camera texture update error:', e);
+        Logger.error(`${node.type} texture update error:`, e);
+      }
+      
+      // Restore previous texture binding to avoid state conflicts
+      if (currentTexture && currentTexture !== node.texture) {
+        gl.bindTexture(gl.TEXTURE_2D, currentTexture);
       }
     }
-    
-    // Set up the shader to render this texture
-    if (node.program) {
-      gl.useProgram(node.program);
-      const texLoc = gl.getUniformLocation(node.program, 'u_texture');
-      if (texLoc) {
-        gl.uniform1i(texLoc, 0);
-      }
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, node.texture);
-    }
-    // Continue to render normally
+    // Don't set up shader here - let the normal render flow handle it
   }
   
-  // Handle VideoFileInput node - upload video frame as texture
-  if (node.type === 'VideoFileInput') {
-    if (node.video && node.video.readyState === node.video.HAVE_ENOUGH_DATA) {
-      // Update the node's texture with the current video frame
-      gl.bindTexture(gl.TEXTURE_2D, node.texture);
-      try {
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, node.video);
-        setTextureParams();
-      } catch(e) {
-        // Handle video texture errors
-        Logger.error('VideoFileInput texture update error:', e);
-      }
-    }
-    
-    // Set up the shader to render this texture
-    if (node.program) {
-      gl.useProgram(node.program);
-      const texLoc = gl.getUniformLocation(node.program, 'u_texture');
-      if (texLoc) {
-        gl.uniform1i(texLoc, 0);
-      }
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, node.texture);
-    }
-    // Continue to render normally
-  }
   
   // Handle Text node - render text to canvas then upload as texture
   if (node.type === 'Text') {
@@ -8449,6 +8435,17 @@ function bindNodeInputTextures(node) {
 
   if (node.type === 'Layer' || node.type === 'Composite') {
     Logger.info(`Binding textures for ${node.type} ${node.name}:`);
+  }
+
+  // Special handling for Camera and VideoFileInput nodes - they use their own texture
+  if ((node.type === 'Camera' || node.type === 'VideoFileInput') && node.texture) {
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, node.texture);
+    const texLoc = gl.getUniformLocation(node.program, 'u_texture');
+    if (texLoc !== null && texLoc !== -1) {
+      gl.uniform1i(texLoc, 0);
+    }
+    return; // Camera/VideoFileInput nodes don't have inputs
   }
 
   // First pass: Bind all textures to their respective texture units
