@@ -856,7 +856,7 @@ function updatePermissionUI() {
     if (node.type === 'AudioInput' && !permissions.audio.granted) {
       nodesNeedingPermissions.audio.add(node.id);
     }
-    if (node.type === 'CameraInput' && !permissions.camera.granted) {
+    if (node.type === 'Camera' && !permissions.camera.granted) {
       nodesNeedingPermissions.camera.add(node.id);
     }
   });
@@ -956,7 +956,7 @@ function updatePermissionUI() {
   
   // Refresh node elements to update permission buttons
   nodes.forEach(node => {
-    if ((node.type === 'AudioInput' || node.type === 'CameraInput') && node.element) {
+    if ((node.type === 'AudioInput' || node.type === 'Camera') && node.element) {
       // Re-create the node element to update permission button visibility
       const oldElement = node.element;
       createNodeElement(node);
@@ -1345,11 +1345,17 @@ class SynthNode {
         icon: 'mouse',
         category: 'input'
       },
-      CameraInput: {
+      Camera: {
         inputs: [],
         params: {},
         icon: 'videocam',
         category: 'source'
+      },
+      CameraInput: {
+        inputs: [],
+        params: { component: 'brightness', min: 0.0, max: 1.0 },
+        icon: 'video_camera_back',
+        category: 'input'
       },
       GameControllerInput: {
         inputs: [],
@@ -1407,6 +1413,7 @@ class SynthNode {
       if (this.type === 'RadialGradient') programName = 'radialgradient';
       if (this.type === 'FlowField') programName = 'flowfield';
       if (this.type === 'VideoFileInput') programName = 'videofileinput';
+      if (this.type === 'Camera') programName = 'camera';
       if (this.type === 'CameraInput') programName = 'camerainput';
       if (this.type === 'NoiseDisplace') programName = 'noisedisplace';
       if (this.type === 'PolarWarp') programName = 'polarwarp';
@@ -2454,8 +2461,11 @@ function compileShaders() {
   // VideoFileInput shader - uses text shader (simple texture pass-through)
   programs.videofileinput = programs.text;
   
-  // CameraInput shader - also uses text shader
-  programs.camerainput = programs.text;
+  // Camera shader - uses text shader (simple texture pass-through)
+  programs.camera = programs.text;
+  
+  // CameraInput shader - for control input nodes
+  programs.camerainput = programs.copy;
 
   // Mirror shader
   const fragMirror = `
@@ -4350,7 +4360,7 @@ function createNode(type, x = 100, y = 100) {
   nodes.push(node);
 
   // Setup WebGL resources
-  if (node.type === 'CameraInput') {
+  if (node.type === 'Camera') {
     setupCameraNode(node);
   } else if (node.type === 'VideoFileInput') {
     setupVideoFileNode(node);
@@ -4365,7 +4375,7 @@ function createNode(type, x = 100, y = 100) {
   updateExistingControlInputs(); // Update control input manager
   
   // Check if this node needs permissions
-  if (type === 'AudioInput' || type === 'CameraInput') {
+  if (type === 'AudioInput' || type === 'Camera') {
     updatePermissionUI();
   }
   
@@ -4406,7 +4416,7 @@ function deleteNode(node) {
   }
   
   // Update permissions UI if we deleted a node that needed permissions
-  if (node.type === 'AudioInput' || node.type === 'CameraInput') {
+  if (node.type === 'AudioInput' || node.type === 'Camera') {
     updatePermissionUI();
   }
 
@@ -4567,6 +4577,7 @@ function allocateNodeFBO(node) {
     if (node.type === 'RadialGradient') programKey = 'radialgradient';
     if (node.type === 'FlowField') programKey = 'flowfield';
     if (node.type === 'VideoFileInput') programKey = 'videofileinput';
+    if (node.type === 'Camera') programKey = 'camera';
     if (node.type === 'CameraInput') programKey = 'camerainput';
     if (node.type === 'NoiseDisplace') programKey = 'noisedisplace';
     if (node.type === 'PolarWarp') programKey = 'polarwarp';
@@ -4702,7 +4713,7 @@ function createNodeElement(node) {
         Enable Audio
       </button>
     `;
-  } else if (node.type === 'CameraInput' && !cameraEnabled && !permissions.camera.denied) {
+  } else if (node.type === 'Camera' && !cameraEnabled && !permissions.camera.denied) {
     permissionButton = `
       <button class="node-permission-btn" onclick="window.requestCameraPermission()" title="Enable camera access">
         <span class="material-icons">videocam</span>
@@ -6084,7 +6095,7 @@ function showNodeProperties(node) {
       <div class="current-value-display">${currentValue.toFixed(3)}</div>
       <div class="help-text">Cursor ${node.params.component} value</div>
     </div>`;
-  } else if (node.type === 'CameraInput') {
+  } else if (node.type === 'Camera') {
     html += `<div class="property-field">
       <div class="property-label">Camera Status</div>
       <div class="help-text">${node.stream ? 'Webcam active' : 'No webcam connected'}</div>
@@ -6092,7 +6103,32 @@ function showNodeProperties(node) {
     html += `<div class="property-field">
       <div class="property-label">Camera Access</div>
       <button id="enable-camera-btn-${node.id}" class="create-btn" style="width: 100%;">
-        ${node.stream ? 'Camera Input Active' : 'Enable Camera Input'}
+        ${node.stream ? 'Camera Active' : 'Enable Camera'}
+      </button>
+    </div>`;
+  } else if (node.type === 'CameraInput') {
+    const currentValue = node.currentValue || 0;
+    const currentComponent = node.params.component || 'brightness';
+    html += `<div class="property-field">
+      <div class="property-label">Current Output</div>
+      <div class="current-value-display">${currentValue.toFixed(3)}</div>
+      <div class="help-text">${cameraComponents[currentComponent]?.name || currentComponent}</div>
+    </div>`;
+    
+    // Component selector
+    html += `<div class="property-field">
+      <label class="property-label" for="camera-component-${node.id}">Analysis Type</label>
+      <select id="camera-component-${node.id}" class="property-input" data-param="component">
+        ${Object.entries(cameraComponents).map(([key, comp]) => 
+          `<option value="${key}" ${currentComponent === key ? 'selected' : ''}>${comp.name}</option>`
+        ).join('')}
+      </select>
+    </div>`;
+    
+    html += `<div class="property-field">
+      <div class="property-label">Camera Access</div>
+      <button id="enable-camera-btn-${node.id}" class="create-btn" style="width: 100%;">
+        ${cameraEnabled ? 'Camera Analysis Active' : 'Enable Camera Analysis'}
       </button>
     </div>`;
   } else if (node.type === 'VideoFileInput') {
@@ -6662,19 +6698,35 @@ function showNodeProperties(node) {
     });
   }
 
-  // Add camera input button event listener
+  // Add camera button event listener
   const cameraBtn = panel.querySelector(`#enable-camera-btn-${node.id}`);
   if (cameraBtn) {
     cameraBtn.addEventListener('click', async () => {
-      if (!node.stream) {
-        try {
-          await enableWebcamForNode(node);
-          cameraBtn.textContent = 'Camera Input Active';
-          cameraBtn.disabled = true;
-          cameraBtn.style.background = '#10b981';
-        } catch (error) {
-          cameraBtn.textContent = 'Camera Access Denied';
-          cameraBtn.style.background = '#ef4444';
+      if (node.type === 'Camera') {
+        // For Camera source nodes - just enable webcam
+        if (!node.stream) {
+          try {
+            await enableWebcamForNode(node);
+            cameraBtn.textContent = 'Camera Active';
+            cameraBtn.disabled = true;
+            cameraBtn.style.background = '#10b981';
+          } catch (error) {
+            cameraBtn.textContent = 'Camera Access Denied';
+            cameraBtn.style.background = '#ef4444';
+          }
+        }
+      } else if (node.type === 'CameraInput') {
+        // For CameraInput control nodes - enable camera analysis
+        if (!cameraEnabled) {
+          try {
+            await enableCameraInput();
+            cameraBtn.textContent = 'Camera Analysis Active';
+            cameraBtn.disabled = true;
+            cameraBtn.style.background = '#10b981';
+          } catch (error) {
+            cameraBtn.textContent = 'Camera Access Denied';
+            cameraBtn.style.background = '#ef4444';
+          }
         }
       }
     });
@@ -6728,6 +6780,22 @@ function showNodeProperties(node) {
       node.video.currentTime = 0;
       const playBtn = panel.querySelector(`#play-btn-${node.id}`);
       if (playBtn) playBtn.textContent = 'Play';
+    });
+  }
+  
+  // Add camera component selector event listener
+  const cameraComponentSelect = panel.querySelector(`#camera-component-${node.id}`);
+  if (cameraComponentSelect) {
+    cameraComponentSelect.addEventListener('change', (e) => {
+      node.params.component = e.target.value;
+      markUnsaved();
+      saveState('Change camera analysis type');
+      
+      // Update help text
+      const helpText = panel.querySelector(`#node-properties-${node.id} .help-text`);
+      if (helpText && cameraComponents[e.target.value]) {
+        helpText.textContent = cameraComponents[e.target.value].name;
+      }
     });
   }
   
@@ -7380,8 +7448,9 @@ function updateInputNodeValue(node, time) {
       break;
 
     case 'CameraInput':
-      // For now, just oscillate as a demo
-      const rawCameraValue = (Math.sin(time * 2) + 1) / 2;
+      // Get camera analysis component value
+      const cameraComponent = node.params.component || 'brightness';
+      const rawCameraValue = cameraComponents[cameraComponent]?.value || 0;
       // Map to configured min/max range
       const cameraMin = node.params.min || 0;
       const cameraMax = node.params.max || 1;
@@ -7591,9 +7660,15 @@ function updateInputNodeValue(node, time) {
         helpText.textContent = `Cursor ${node.params.component} value`;
       }
     } else if (node.type === 'CameraInput') {
-      const helpText = document.querySelector('.property-field .help-text');
-      if (helpText) {
-        helpText.textContent = `Camera ${node.params.component} value`;
+      // Update current value display
+      const valueDisplay = document.querySelector(`#node-properties-${node.id} .current-value-display`);
+      if (valueDisplay) {
+        valueDisplay.textContent = value.toFixed(3);
+      }
+      // Update help text
+      const helpText = document.querySelector(`#node-properties-${node.id} .help-text`);
+      if (helpText && cameraComponents[node.params.component]) {
+        helpText.textContent = cameraComponents[node.params.component].name;
       }
     }
   }
@@ -7744,7 +7819,7 @@ function renderNode(node, time) {
     }
   }
 
-  if (node.type === 'CameraInput') {
+  if (node.type === 'Camera') {
     if (node.video && node.video.readyState === node.video.HAVE_ENOUGH_DATA) {
       gl.bindTexture(gl.TEXTURE_2D, node.texture);
       try {
@@ -10167,7 +10242,7 @@ function deserializeProject(projectData) {
         node.groupName = nodeData.groupName;
 
         // Initialize node (create textures, programs, etc.)
-        if (node.type === 'CameraInput') {
+        if (node.type === 'Camera') {
           initCameraNode(node);
         } else if (node.type === 'VideoFileInput') {
           initVideoFileNode(node);
