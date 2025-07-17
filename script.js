@@ -83,6 +83,8 @@ const PARAMETER_CONSTRAINTS = {
     values: ['x', 'y', 'velocity', 'click', 'motionX', 'brightness', 'motion', 'contrast'],
     default: 'x'
   },
+  deadzone: { type: 'number', min: 0, max: 0.5, step: 0.01, default: 0.1 },
+  smoothing: { type: 'number', min: 0, max: 0.99, step: 0.01, default: 0.0 },
 
   // String parameters with allowed values
   colorPalette: {
@@ -708,6 +710,7 @@ const nodeDefinitions = {
   AudioInput: { inputs: [] },
   CursorInput: { inputs: [] },
   CameraInput: { inputs: [] },
+  GameControllerInput: { inputs: [] },
   RandomInput: { inputs: [] },
   RangeInput: { inputs: [] },
 
@@ -749,15 +752,15 @@ const LAYOUT_CONFIG = {
   // Layer positions from left to right
   layers: {
     input: { x: 50, label: 'Inputs' },
-    source: { x: 250, label: 'Sources' },
-    effect: { x: 450, label: 'Effects' },
-    compositing: { x: 650, label: 'Compositing' },
-    system: { x: 850, label: 'Output' }
+    source: { x: 280, label: 'Sources' },
+    effect: { x: 510, label: 'Effects' },
+    compositing: { x: 740, label: 'Compositing' },
+    system: { x: 970, label: 'Output' }
   },
-  // Spacing between nodes
-  nodeSpacing: { x: 200, y: 120 },
+  // Spacing between nodes - increased for better visibility
+  nodeSpacing: { x: 220, y: 150 },
   // Padding around the layout
-  padding: { x: 50, y: 80 }
+  padding: { x: 60, y: 100 }
 };
 
 /** Group system */
@@ -790,6 +793,199 @@ const audioBands = {
 // Audio analysis state
 let audioAnalysisBuffer = [];
 let peakHoldTime = 0;
+
+// Permission tracking system
+const permissions = {
+  audio: {
+    requested: false,
+    granted: false,
+    denied: false
+  },
+  camera: {
+    requested: false,
+    granted: false,
+    denied: false
+  }
+};
+
+// Track which nodes need permissions
+const nodesNeedingPermissions = {
+  audio: new Set(),
+  camera: new Set()
+};
+
+/**
+ * Update permission UI based on current state
+ */
+function updatePermissionUI() {
+  // Update any existing permission banner
+  const existingBanner = document.getElementById('permission-banner');
+  if (existingBanner) {
+    existingBanner.remove();
+  }
+  
+  // Check if any nodes need permissions
+  nodesNeedingPermissions.audio.clear();
+  nodesNeedingPermissions.camera.clear();
+  
+  nodes.forEach(node => {
+    if (node.type === 'AudioInput' && !permissions.audio.granted) {
+      nodesNeedingPermissions.audio.add(node.id);
+    }
+    if ((node.type === 'CameraInput' || node.type === 'Video') && !permissions.camera.granted) {
+      nodesNeedingPermissions.camera.add(node.id);
+    }
+  });
+  
+  // Show banner if permissions are needed
+  const needsAudio = nodesNeedingPermissions.audio.size > 0 && !permissions.audio.denied;
+  const needsCamera = nodesNeedingPermissions.camera.size > 0 && !permissions.camera.denied;
+  
+  if (needsAudio || needsCamera) {
+    const banner = document.createElement('div');
+    banner.id = 'permission-banner';
+    banner.style.cssText = `
+      position: fixed;
+      top: 70px;
+      left: 20px;
+      background: #f59e0b;
+      color: white;
+      padding: 12px 16px;
+      border-radius: 8px;
+      z-index: 9999;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: slideIn 0.3s ease-out;
+    `;
+    
+    // Add animation CSS if not already present
+    if (!document.getElementById('permission-banner-styles')) {
+      const style = document.createElement('style');
+      style.id = 'permission-banner-styles';
+      style.textContent = `
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateX(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        
+        #permission-banner button:hover {
+          opacity: 0.9;
+          transform: scale(1.05);
+          transition: all 0.2s ease;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    
+    let html = '<span class="material-icons">warning</span><div>';
+    
+    if (needsAudio && needsCamera) {
+      html += 'Audio and Camera permissions needed';
+    } else if (needsAudio) {
+      html += 'Audio permission needed for Audio Input nodes';
+    } else {
+      html += 'Camera permission needed for Camera/Video nodes';
+    }
+    
+    html += '</div>';
+    
+    if (needsAudio) {
+      html += `<button onclick="window.requestAudioPermission()" style="
+        background: white;
+        color: #f59e0b;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+      ">Enable Audio</button>`;
+    }
+    
+    if (needsCamera) {
+      html += `<button onclick="window.requestCameraPermission()" style="
+        background: white;
+        color: #f59e0b;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+      ">Enable Camera</button>`;
+    }
+    
+    banner.innerHTML = html;
+    document.body.appendChild(banner);
+  }
+  
+  // Update node UI elements if properties panel is open
+  if (selectedNode) {
+    updatePropertiesPanel(selectedNode);
+  }
+  
+  // Refresh node elements to update permission buttons
+  nodes.forEach(node => {
+    if ((node.type === 'AudioInput' || node.type === 'CameraInput' || node.type === 'Video') && node.element) {
+      // Re-create the node element to update permission button visibility
+      const oldElement = node.element;
+      createNodeElement(node);
+      if (oldElement && oldElement.parentNode) {
+        oldElement.remove();
+      }
+    }
+  });
+}
+
+// Global functions for permission requests
+window.requestAudioPermission = async function() {
+  if (!audioEnabled) {
+    try {
+      permissions.audio.requested = true;
+      updatePermissionUI();
+      
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
+      });
+      
+      microphone = audioContext.createMediaStreamSource(stream);
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 4096;
+      analyser.smoothingTimeConstant = 0.85;
+      microphone.connect(analyser);
+      frequencyData = new Uint8Array(analyser.frequencyBinCount);
+      
+      audioEnabled = true;
+      permissions.audio.granted = true;
+      permissions.audio.denied = false;
+      updatePermissionUI();
+      
+      Logger.info('Audio permission granted');
+    } catch (error) {
+      Logger.error('Audio permission denied:', error);
+      permissions.audio.denied = true;
+      permissions.audio.granted = false;
+      updatePermissionUI();
+    }
+  }
+};
+
+window.requestCameraPermission = async function() {
+  if (!cameraEnabled) {
+    await enableCameraInput();
+  }
+};
 
 // Control input system
 const controlInputs = {
@@ -835,6 +1031,54 @@ const cameraComponents = {
   blueAvg: { value: 0, name: 'Average Blue (0-1)' },
   contrast: { value: 0, name: 'Image Contrast (0-1)' }
 };
+
+/** Game Controller Input System */
+const gamepadState = {
+  controllers: {},
+  scanning: false,
+  pollInterval: null
+};
+
+// Standard gamepad button mapping
+const GAMEPAD_BUTTONS = [
+  'A/Cross',          // 0
+  'B/Circle',         // 1
+  'X/Square',         // 2
+  'Y/Triangle',       // 3
+  'Left Bumper',      // 4
+  'Right Bumper',     // 5
+  'Left Trigger',     // 6
+  'Right Trigger',    // 7
+  'Back/Select',      // 8
+  'Start',            // 9
+  'Left Stick',       // 10
+  'Right Stick',      // 11
+  'D-Pad Up',         // 12
+  'D-Pad Down',       // 13
+  'D-Pad Left',       // 14
+  'D-Pad Right',      // 15
+  'Home/Guide'        // 16
+];
+
+// Standard gamepad axis mapping
+const GAMEPAD_AXES = [
+  'Left Stick X',     // 0
+  'Left Stick Y',     // 1
+  'Right Stick X',    // 2
+  'Right Stick Y'     // 3
+];
+
+// Controller input components
+const controllerComponents = {};
+
+// Initialize components for all possible inputs
+GAMEPAD_BUTTONS.forEach((name, index) => {
+  controllerComponents[`button${index}`] = { value: 0, name: name };
+});
+
+GAMEPAD_AXES.forEach((name, index) => {
+  controllerComponents[`axis${index}`] = { value: 0, name: name };
+});
 
 const colorPalettes = {
   'rainbow': [
@@ -999,6 +1243,18 @@ class SynthNode {
         icon: 'videocam',
         category: 'input'
       },
+      GameControllerInput: {
+        inputs: [],
+        params: { 
+          component: 'button0',
+          min: 0.0, 
+          max: 1.0,
+          deadzone: 0.1,
+          smoothing: 0.0
+        },
+        icon: 'sports_esports',
+        category: 'input'
+      },
       RandomInput: {
         inputs: [],
         params: { min: 0.0, max: 1.0, interval: 0.1 },
@@ -1137,6 +1393,7 @@ function init() {
   initAudio();
   initCursor();
   initCamera();
+  initGamepad();
   handleResolutionChange('Medium');
 
   // Create the permanent Final Output node
@@ -1172,7 +1429,13 @@ function init() {
   startAudioAnalysis();
   startCursorTracking();
   startCameraAnalysis();
+  startGamepadPolling();
   startMemoryMonitoring();
+  
+  // Check for nodes needing permissions after project restore
+  setTimeout(() => {
+    updatePermissionUI();
+  }, 500);
 
   // Don't perform auto-layout on initialization - let user trigger it manually
 }
@@ -1895,6 +2158,9 @@ function compileShaders() {
   programs.audioinput = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragInput));
   programs.cursorinput = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragInput));
   programs.camerainput = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragInput));
+  programs.gamecontrollerinput = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragInput));
+  programs.randominput = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragInput));
+  programs.rangeinput = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragInput));
 
   // Final Output shader - uses copy shader for passthrough
   programs.finaloutput = programs.copy;
@@ -3588,6 +3854,16 @@ function createNode(type, x = 100, y = 100) {
   updateConnections();
   updateMainOutputDropdown();
   updateExistingControlInputs(); // Update control input manager
+  
+  // Check if this node needs permissions
+  if (type === 'AudioInput' || type === 'CameraInput' || type === 'Video') {
+    updatePermissionUI();
+  }
+  
+  // Update gamepad status for controller nodes
+  if (type === 'GameControllerInput') {
+    updateGamepadStatus();
+  }
 
   // Don't auto-layout on every node addition - it causes constant repositioning
   // Auto-layout should only happen on initial load or manual trigger
@@ -3618,6 +3894,11 @@ function deleteNode(node) {
   const index = nodes.indexOf(node);
   if (index !== -1) {
     nodes.splice(index, 1);
+  }
+  
+  // Update permissions UI if we deleted a node that needed permissions
+  if (node.type === 'AudioInput' || node.type === 'CameraInput' || node.type === 'Video') {
+    updatePermissionUI();
   }
 
   // Remove connections to this node from other nodes
@@ -3775,8 +4056,15 @@ function allocateNodeFBO(node) {
     if (programs[programKey]) {
       node.program = programs[programKey];
     } else {
-      Logger.error('No shader program found for node type:', node.type);
-      return false;
+      Logger.warn(`No shader program found for node type: ${node.type}, using fallback`);
+      // Use copy shader as fallback for input nodes
+      if (node.category === 'input' && programs.copy) {
+        node.program = programs.copy;
+        Logger.info(`Using copy shader as fallback for ${node.type}`);
+      } else {
+        Logger.error('No shader program and no fallback available for node type:', node.type);
+        return false;
+      }
     }
 
     Logger.info(`Successfully allocated FBO for ${node.name}`);
@@ -3817,14 +4105,13 @@ function createNodeElement(node) {
     </div>
   `).join('');
 
-  // Control input ports for effect nodes
+  // Control input ports for effect nodes - always expanded
   const controlPorts = node.controlInputs && node.controlInputs.length > 0 ? `
     <div class="control-ports-section">
       <div class="control-ports-header">
-        Controls
-        ${node.controlInputs.length > 4 ? '<button class="control-toggle" data-expanded="false">−</button>' : ''}
+        <span class="control-ports-title">Controls</span>
       </div>
-      <div class="control-ports-list ${node.controlInputs.length > 4 ? 'collapsible' : ''}">
+      <div class="control-ports-list">
         ${node.controlInputs.map((_, i) => {
           const paramNames = Object.keys(node.params);
           const paramName = paramNames[i] || `Ctrl ${i + 1}`;
@@ -3846,10 +4133,40 @@ function createNodeElement(node) {
     </div>
   `;
 
+  // Show permission button for nodes that need it
+  let permissionButton = '';
+  if (node.type === 'AudioInput' && !audioEnabled && !permissions.audio.denied) {
+    permissionButton = `
+      <button class="node-permission-btn" onclick="window.requestAudioPermission()" title="Enable microphone access">
+        <span class="material-icons">mic</span>
+        Enable Audio
+      </button>
+    `;
+  } else if ((node.type === 'CameraInput' || node.type === 'Video') && !cameraEnabled && !permissions.camera.denied) {
+    permissionButton = `
+      <button class="node-permission-btn" onclick="window.requestCameraPermission()" title="Enable camera access">
+        <span class="material-icons">videocam</span>
+        Enable Camera
+      </button>
+    `;
+  }
+
+  // Add controller status indicator for GameControllerInput nodes
+  let statusIndicator = '';
+  if (node.type === 'GameControllerInput') {
+    const controllerCount = Object.keys(gamepadState.controllers).length;
+    statusIndicator = `
+      <span class="controller-status" title="${controllerCount > 0 ? controllerCount + ' controller(s) connected' : 'No controllers connected'}">
+        ${controllerCount > 0 ? '🎮' : '⚠️'}
+      </span>
+    `;
+  }
+
   nodeEl.innerHTML = `
     <div class="node-header">
       <span class="material-icons node-icon">${node.icon}</span>
       <span class="node-title">${node.name}</span>
+      ${statusIndicator}
       <div class="node-enabled ${node.enabled ? 'checked' : ''}"></div>
       ${node.category === 'system' ? '' : '<button class="node-delete">×</button>'}
     </div>
@@ -3860,7 +4177,467 @@ function createNodeElement(node) {
         ${outputPort}
       </div>
     </div>
+    ${permissionButton}
   `;
+  
+  // Add CSS for permission button and node styles if not already present
+  if (!document.getElementById('node-permission-styles')) {
+    const style = document.createElement('style');
+    style.id = 'node-permission-styles';
+    style.textContent = `
+      .node-permission-btn {
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%) translateY(4px);
+        background: #f59e0b;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 4px 8px;
+        font-size: 11px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+        z-index: 10;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+      
+      .node-permission-btn:hover {
+        background: #dc9a05;
+        transform: translateX(-50%) translateY(4px) scale(1.05);
+      }
+      
+      .node-permission-btn .material-icons {
+        font-size: 14px;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
+  // Add node layout styles if not already present
+  if (!document.getElementById('node-layout-styles')) {
+    const style = document.createElement('style');
+    style.id = 'node-layout-styles';
+    style.textContent = `
+      .graph-node {
+        position: absolute;
+        background: #2a2a2a;
+        border: 1px solid #444;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        min-width: 160px;
+        font-size: 12px;
+        user-select: none;
+        transition: box-shadow 0.2s ease;
+      }
+      
+      .graph-node:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+      }
+      
+      .graph-node.selected {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+      }
+      
+      .node-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        background: #1a1a1a;
+        border-radius: 8px 8px 0 0;
+        border-bottom: 1px solid #333;
+      }
+      
+      .node-icon {
+        font-size: 18px;
+        color: #888;
+      }
+      
+      .node-title {
+        flex: 1;
+        font-weight: 500;
+        color: #fff;
+      }
+      
+      .node-enabled {
+        width: 16px;
+        height: 16px;
+        background: #333;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: background 0.2s ease;
+      }
+      
+      .node-enabled.checked {
+        background: #10b981;
+      }
+      
+      .node-delete {
+        background: none;
+        border: none;
+        color: #888;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 0;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: color 0.2s ease;
+      }
+      
+      .node-delete:hover {
+        color: #ef4444;
+      }
+      
+      .node-body {
+        padding: 6px;
+      }
+      
+      .node-ports {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      
+      .node-port {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 3px 6px;
+        position: relative;
+      }
+      
+      .port {
+        width: 12px;
+        height: 12px;
+        background: #555;
+        border: 2px solid #333;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      
+      .port:hover {
+        background: #888;
+        border-color: #555;
+      }
+      
+      .port.input {
+        margin-right: auto;
+      }
+      
+      .port.output {
+        margin-left: auto;
+      }
+      
+      .port.connected {
+        background: #3b82f6;
+        border-color: #2563eb;
+      }
+      
+      .control-ports-section {
+        margin-top: 6px;
+        border-top: 1px solid #333;
+        padding-top: 6px;
+      }
+      
+      .control-ports-header {
+        padding: 4px 6px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      
+      .control-ports-title {
+        font-size: 11px;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      
+      .control-ports-list {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      
+      .control-port {
+        padding: 2px 6px;
+      }
+      
+      .control-port .port {
+        width: 10px;
+        height: 10px;
+        background: #f59e0b;
+        border-color: #dc9a05;
+      }
+      
+      .control-port .port:hover {
+        background: #dc9a05;
+        border-color: #b87c04;
+      }
+      
+      .control-port .port.connected {
+        background: #f59e0b;
+        border-color: #dc9a05;
+      }
+      
+      .control-label {
+        font-size: 10px;
+        color: #aaa;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100px;
+      }
+      
+      /* Node categories */
+      .graph-node.source .node-icon {
+        color: #10b981;
+      }
+      
+      .graph-node.effect .node-icon {
+        color: #3b82f6;
+      }
+      
+      .graph-node.compositing .node-icon {
+        color: #8b5cf6;
+      }
+      
+      .graph-node.input .node-icon {
+        color: #f59e0b;
+      }
+      
+      .graph-node.system .node-icon {
+        color: #ef4444;
+      }
+      
+      .graph-node.system .node-header {
+        background: #1f1414;
+      }
+      
+      /* Disabled state */
+      .graph-node.disabled {
+        opacity: 0.6;
+      }
+      
+      .graph-node.disabled .node-header {
+        background: #1a1a1a;
+      }
+      
+      /* Controller status indicator */
+      .controller-status {
+        margin-left: auto;
+        margin-right: 8px;
+        font-size: 16px;
+      }
+      
+      /* Controller visualization styles */
+      .controller-visualization {
+        background: #1a1a1a;
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 8px;
+        overflow: visible;
+        min-height: 260px;
+      }
+      
+      .controller-viz-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+      
+      .controller-main {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        width: 100%;
+        max-width: 400px;
+      }
+      
+      /* D-Pad */
+      .controller-dpad {
+        position: relative;
+        width: 90px;
+        height: 90px;
+      }
+      
+      .dpad-button {
+        position: absolute;
+        width: 24px;
+        height: 24px;
+        background: #333;
+        border: 1px solid #555;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: #888;
+        cursor: pointer;
+        transition: all 0.1s ease;
+      }
+      
+      .dpad-button.pressed {
+        background: #3b82f6;
+        color: white;
+        transform: scale(0.95);
+      }
+      
+      .dpad-up { top: 0; left: 33px; }
+      .dpad-down { bottom: 0; left: 33px; }
+      .dpad-left { left: 0; top: 33px; }
+      .dpad-right { left: 66px; top: 33px; }
+      .controller-dpad .dpad-button:hover {
+        background: #444;
+      }
+      
+      /* Analog sticks */
+      .controller-sticks {
+        display: flex;
+        gap: 15px;
+      }
+      
+      .stick-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+      }
+      
+      .stick-base {
+        width: 50px;
+        height: 50px;
+        background: #2a2a2a;
+        border: 2px solid #444;
+        border-radius: 50%;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .stick-position {
+        width: 20px;
+        height: 20px;
+        background: #555;
+        border-radius: 50%;
+        position: absolute;
+        transition: background 0.1s ease;
+      }
+      
+      .stick-position.active {
+        background: #f59e0b;
+      }
+      
+      .stick-label {
+        font-size: 10px;
+        color: #666;
+      }
+      
+      /* Face buttons */
+      .controller-face-buttons {
+        position: relative;
+        width: 90px;
+        height: 90px;
+      }
+      
+      .face-button {
+        position: absolute;
+        width: 24px;
+        height: 24px;
+        background: #333;
+        border: 1px solid #555;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: #888;
+        cursor: pointer;
+        transition: all 0.1s ease;
+      }
+      
+      .face-button.pressed {
+        background: #10b981;
+        color: white;
+        transform: scale(0.95);
+      }
+      
+      .button-y { top: 0; left: 33px; }
+      .button-a { bottom: 0; left: 33px; }
+      .button-x { left: 0; top: 33px; }
+      .button-b { left: 66px; top: 33px; }
+      
+      /* Shoulders and triggers */
+      .controller-shoulders {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        width: 100%;
+        justify-content: center;
+      }
+      
+      .shoulder-button, .trigger {
+        padding: 4px 12px;
+        background: #333;
+        border: 1px solid #555;
+        border-radius: 4px;
+        font-size: 10px;
+        color: #888;
+        transition: all 0.1s ease;
+      }
+      
+      .shoulder-button.pressed, .trigger.pressed {
+        background: #8b5cf6;
+        color: white;
+      }
+      
+      .trigger {
+        min-width: 30px;
+      }
+      
+      /* Center buttons */
+      .controller-center-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+      }
+      
+      .center-button {
+        padding: 4px 10px;
+        background: #333;
+        border: 1px solid #555;
+        border-radius: 4px;
+        font-size: 9px;
+        color: #888;
+        transition: all 0.1s ease;
+      }
+      
+      .center-button.pressed {
+        background: #666;
+        color: white;
+      }
+      
+      /* Selected input highlight */
+      .selected-input {
+        box-shadow: 0 0 0 2px #f59e0b;
+      }
+    `;
+    document.head.appendChild(style);
+  }
 
   container.appendChild(nodeEl);
   node.element = nodeEl;
@@ -3888,38 +4665,7 @@ function createNodeElement(node) {
     });
   }
 
-  // Control ports toggle functionality
-  const controlToggle = nodeEl.querySelector('.control-toggle');
-  if (controlToggle) {
-    controlToggle.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isExpanded = controlToggle.dataset.expanded === 'true';
-      const controlPortsList = nodeEl.querySelector('.control-ports-list');
-
-      if (isExpanded) {
-        // Collapse - hide control ports
-        controlPortsList.classList.add('collapsed');
-        controlToggle.textContent = '+';
-        controlToggle.dataset.expanded = 'false';
-      } else {
-        // Expand - show control ports
-        controlPortsList.classList.remove('collapsed');
-        controlToggle.textContent = '−';
-        controlToggle.dataset.expanded = 'true';
-      }
-
-      // Update connections after collapse/expand
-      setTimeout(() => updateConnections(), 50);
-    });
-
-    // Auto-collapse nodes with >4 control inputs
-    if (node.controlInputs && node.controlInputs.length > 4) {
-      const controlPortsList = nodeEl.querySelector('.control-ports-list');
-      controlPortsList.classList.add('collapsed');
-      controlToggle.textContent = '+';
-      controlToggle.dataset.expanded = 'false';
-    }
-  }
+  // No toggle functionality - control ports are always visible
 
   // Update node width based on actual DOM element
   setTimeout(() => {
@@ -4577,12 +5323,10 @@ function updateConnections() {
 
           // Get the actual control port element position
           const controlPortElement = node.element?.querySelector(`[data-control="${controlIndex}"]`);
-          const controlPortsList = node.element?.querySelector('.control-ports-list');
-          const isCollapsed = controlPortsList?.classList.contains('collapsed');
           let controlPort;
 
-          if (controlPortElement && !isCollapsed) {
-            // Control ports are visible - use actual port position
+          if (controlPortElement) {
+            // Control port is visible - use actual port position
             const rect = controlPortElement.getBoundingClientRect();
             const svgRect = document.getElementById('connections-svg').getBoundingClientRect();
 
@@ -4590,14 +5334,6 @@ function updateConnections() {
             controlPort = {
               x: rect.left + rect.width / 2 - svgRect.left,
               y: rect.top + rect.height / 2 - svgRect.top
-            };
-          } else if (isCollapsed) {
-            // Control ports are collapsed - connect to left edge of node
-            const nodeRect = node.element.getBoundingClientRect();
-            const svgRect = document.getElementById('connections-svg').getBoundingClientRect();
-            controlPort = {
-              x: nodeRect.left - svgRect.left,
-              y: nodeRect.top + nodeRect.height / 2 - svgRect.top + (controlIndex - node.controlInputs.length / 2) * 8
             };
           } else {
             // Fallback to estimated position
@@ -4801,21 +5537,71 @@ function showNodeProperties(node) {
         ${cameraEnabled ? 'Camera Input Active' : 'Enable Camera Input'}
       </button>
     </div>`;
+  } else if (node.type === 'GameControllerInput') {
+    const controllerComponent = node.params.component || 'button0';
+    const currentValue = node.currentValue || 0;
+    const controllerCount = Object.keys(gamepadState.controllers).length;
+    const firstController = Object.values(gamepadState.controllers)[0];
+    
+    html += `<div class="property-field">
+      <div class="property-label">Current Output</div>
+      <div class="current-value-display">${currentValue.toFixed(3)}</div>
+      <div class="help-text">${controllerComponents[controllerComponent]?.name || controllerComponent}</div>
+    </div>`;
+    
+    html += `<div class="property-field">
+      <div class="property-label">Controller Status</div>
+      <div class="controller-status-display">
+        ${controllerCount > 0 ? 
+          `<span style="color: #10b981;">🎮 ${controllerCount} controller(s) connected</span>` : 
+          '<span style="color: #f59e0b;">⚠️ No controllers connected - Press any button</span>'}
+      </div>
+      ${firstController ? `<div style="font-size: 11px; color: #888; margin-top: 4px;">${firstController.id}</div>` : ''}
+      <button id="detect-gamepad-btn" class="create-btn" style="margin-top: 8px; width: 100%;">
+        <span class="material-icons">gamepad</span>
+        Detect Gamepad
+      </button>
+    </div>`;
+    
+    // Controller visualization
+    html += `<div class="property-field">
+      <div class="property-label">Controller Input Monitor</div>
+      <div id="controller-viz-${node.id}" class="controller-visualization">
+        ${controllerCount > 0 ? createControllerVisualization(firstController, controllerComponent) : 
+          '<div style="text-align: center; padding: 20px; color: #666;">Connect a controller and press any button</div>'}
+      </div>
+    </div>`;
+    
+    // Component selector with all available inputs
+    html += `<div class="property-field">
+      <label class="property-label" for="controller-component-${node.id}">Input Source</label>
+      <select id="controller-component-${node.id}" class="property-input" data-param="component">
+        <optgroup label="Buttons">
+          ${GAMEPAD_BUTTONS.map((name, i) => 
+            `<option value="button${i}" ${controllerComponent === `button${i}` ? 'selected' : ''}>${name}</option>`
+          ).join('')}
+        </optgroup>
+        <optgroup label="Axes">
+          ${GAMEPAD_AXES.map((name, i) => 
+            `<option value="axis${i}" ${controllerComponent === `axis${i}` ? 'selected' : ''}>${name}</option>`
+          ).join('')}
+        </optgroup>
+      </select>
+    </div>`;
   } else if (node.type === 'RandomInput') {
-    // Calculate the current mapped value for display
-    const rawValue = node.randomValue || 0;
-    const mappedValue = node.params.min + (rawValue * (node.params.max - node.params.min));
-    const displayValue = mappedValue.toFixed(3);
+    // Show the actual output value directly
+    const outputValue = node.currentValue || 0;
+    const displayValue = outputValue.toFixed(3);
     html += `<div class="property-field">
       <div class="property-label">Current Output</div>
       <div class="current-value-display">${displayValue}</div>
       <div class="help-text">Live random value (updates every ${node.params.interval} seconds)</div>
     </div>`;
   } else if (node.type === 'RangeInput') {
-    // Calculate the current mapped value for display
+    // Show the actual output value directly
+    const outputValue = node.currentValue || 0;
+    const displayValue = outputValue.toFixed(3);
     const progress = node.rangeProgress || 0;
-    const mappedValue = node.params.min + (progress * (node.params.max - node.params.min));
-    const displayValue = mappedValue.toFixed(3);
     const progressPercent = (progress * 100).toFixed(1);
     html += `<div class="property-field">
       <div class="property-label">Current Output</div>
@@ -4826,6 +5612,11 @@ function showNodeProperties(node) {
 
     // Generate property controls based on node type
     Object.entries(node.params).forEach(([key, value]) => {
+    // Skip component parameter for GameControllerInput as it's handled above
+    if (node.type === 'GameControllerInput' && key === 'component') {
+      return;
+    }
+    
     // Add units to certain parameter labels
     let labelText = key;
     if (key === 'interval' && node.type === 'RandomInput') {
@@ -4970,6 +5761,61 @@ function showNodeProperties(node) {
     }
   }
 
+
+  // Add event listener for gamepad detection button
+  const detectGamepadBtn = panel.querySelector('#detect-gamepad-btn');
+  if (detectGamepadBtn) {
+    detectGamepadBtn.addEventListener('click', () => {
+      detectGamepadBtn.textContent = 'Press any gamepad button...';
+      detectGamepadBtn.disabled = true;
+      
+      // Start intensive polling for gamepad detection
+      let detectionAttempts = 0;
+      const maxAttempts = 30; // 3 seconds
+      const detectionInterval = setInterval(() => {
+        const gamepads = navigator.getGamepads();
+        let foundGamepad = false;
+        
+        for (let i = 0; i < gamepads.length; i++) {
+          const gamepad = gamepads[i];
+          if (gamepad && gamepad.connected) {
+            // Check if any button is pressed
+            for (let j = 0; j < gamepad.buttons.length; j++) {
+              if (gamepad.buttons[j].pressed) {
+                foundGamepad = true;
+                
+                // Add to gamepad state if not already there
+                if (!gamepadState.controllers[gamepad.index]) {
+                  gamepadState.controllers[gamepad.index] = {
+                    index: gamepad.index,
+                    id: gamepad.id,
+                    timestamp: gamepad.timestamp
+                  };
+                  Logger.info('Gamepad detected via manual detection:', gamepad.id);
+                }
+                
+                // Update the properties panel to show the detected controller
+                updatePropertiesPanel(node);
+                break;
+              }
+            }
+            if (foundGamepad) break;
+          }
+        }
+        
+        if (foundGamepad || ++detectionAttempts >= maxAttempts) {
+          clearInterval(detectionInterval);
+          if (!foundGamepad) {
+            detectGamepadBtn.innerHTML = '<span class="material-icons">error</span> No gamepad detected';
+            setTimeout(() => {
+              detectGamepadBtn.innerHTML = '<span class="material-icons">gamepad</span> Detect Gamepad';
+              detectGamepadBtn.disabled = false;
+            }, 2000);
+          }
+        }
+      }, 100);
+    });
+  }
 
   // Add event listeners for property changes
   panel.querySelectorAll('.property-input, .property-slider, .property-number').forEach(input => {
@@ -5220,8 +6066,8 @@ function showNodeProperties(node) {
 
           microphone = audioContext.createMediaStreamSource(stream);
           analyser = audioContext.createAnalyser();
-          analyser.fftSize = 2048;
-          analyser.smoothingTimeConstant = 0.3;
+          analyser.fftSize = 4096;
+          analyser.smoothingTimeConstant = 0.85;
 
           microphone.connect(analyser);
           frequencyData = new Uint8Array(analyser.frequencyBinCount);
@@ -5275,6 +6121,28 @@ function showNodeProperties(node) {
           cameraBtn.textContent = 'Camera Access Denied';
           cameraBtn.style.background = '#ef4444';
         }
+      }
+    });
+  }
+  
+  // Add game controller component selector event listener
+  const controllerComponentSelect = panel.querySelector(`#controller-component-${node.id}`);
+  if (controllerComponentSelect) {
+    controllerComponentSelect.addEventListener('change', (e) => {
+      node.params.component = e.target.value;
+      markUnsaved();
+      saveState('Change controller input');
+      
+      // Update help text
+      const helpText = panel.querySelector('.help-text');
+      if (helpText && controllerComponents[e.target.value]) {
+        helpText.textContent = controllerComponents[e.target.value].name;
+      }
+      
+      // Update visualization to highlight new selection
+      const firstController = Object.values(gamepadState.controllers)[0];
+      if (firstController) {
+        updateControllerVisualization(firstController);
       }
     });
   }
@@ -5879,6 +6747,15 @@ function updateInputNodeValue(node, time) {
         const audioMin = node.params.min || 0;
         const audioMax = node.params.max || 1;
         value = audioMin + (rawValue * (audioMax - audioMin));
+        
+        // Debug logging
+        if (selectedNode === node) {
+          Logger.debug(`AudioInput update:
+            - Band: ${band}
+            - Raw audio level: ${rawValue}
+            - Min/Max: ${audioMin}/${audioMax}
+            - Output value: ${value}`);
+        }
       }
       break;
 
@@ -5904,6 +6781,33 @@ function updateInputNodeValue(node, time) {
       const cameraMax = node.params.max || 1;
       value = cameraMin + (rawCameraValue * (cameraMax - cameraMin));
       break;
+      
+    case 'GameControllerInput':
+      const controllerComponent = node.params.component || 'button0';
+      const rawControllerValue = controllerComponents[controllerComponent]?.value || 0;
+      const deadzone = node.params.deadzone || 0.1;
+      const smoothing = node.params.smoothing || 0.0;
+      
+      // Apply deadzone for analog inputs
+      let processedValue = rawControllerValue;
+      if (controllerComponent.startsWith('axis')) {
+        // For axes, apply deadzone
+        if (Math.abs(rawControllerValue - 0.5) < deadzone / 2) {
+          processedValue = 0.5;
+        }
+      }
+      
+      // Apply smoothing
+      if (smoothing > 0 && node.lastControllerValue !== undefined) {
+        processedValue = node.lastControllerValue + (processedValue - node.lastControllerValue) * (1 - smoothing);
+      }
+      node.lastControllerValue = processedValue;
+      
+      // Map to configured min/max range
+      const controllerMin = node.params.min || 0;
+      const controllerMax = node.params.max || 1;
+      value = controllerMin + (processedValue * (controllerMax - controllerMin));
+      break;
 
     case 'RandomInput':
       // Generate random values at the specified interval (in seconds)
@@ -5925,7 +6829,7 @@ function updateInputNodeValue(node, time) {
         node.lastRandomUpdate = now;
       }
 
-      // Calculate the actual value within the configured range
+      // Output the actual value directly (min-max range)
       const randomMin = node.params.min || 0;
       const randomMax = node.params.max || 1;
       value = randomMin + (node.randomValue * (randomMax - randomMin));
@@ -6037,7 +6941,7 @@ function updateInputNodeValue(node, time) {
         }
       }
       
-      // Calculate the actual value within the range
+      // Output the actual value directly (min-max range)
       const rangeMin = node.params.min || 0;
       const rangeMax = node.params.max || 1;
       value = rangeMin + (curvedProgress * (rangeMax - rangeMin));
@@ -6260,57 +7164,56 @@ function renderNode(node, time) {
         const paramNames = Object.keys(node.params);
         const paramName = paramNames[controlIndex];
         if (paramName) {
-          // Get the control value - it's already in the correct range for RangeInput and RandomInput
-          let value = controlNode.currentValue;
+          // Get the control value directly - no normalization needed!
+          // The control input nodes output exactly what they display
+          let value = controlNode.currentValue || 0;
           
-          // Normalize to 0-1 for parameter mapping
-          if (controlNode.type === 'RangeInput' || controlNode.type === 'RandomInput') {
-            // RangeInput and RandomInput already output values in their configured min/max range
-            // We need to normalize it to 0-1 for the parameter mapping logic below
-            const nodeMin = controlNode.params.min || 0;
-            const nodeMax = controlNode.params.max || 1;
-            value = (value - nodeMin) / (nodeMax - nodeMin);
-          } else {
-            // For other control inputs, assume they output 0-1 range
-            value = value || 0;
+          // Debug logging
+          if (controlNode.type === 'AudioInput' && paramName === 'slices') {
+            Logger.debug(`AudioInput → Kaleidoscope slices:
+              - Direct value: ${value} → ${paramName}`);
           }
 
           // Handle different parameter types
           if (paramName === 'colorPalette') {
-            // Map 0-1 value to available color palettes
+            // For string parameters that need selection, use value as index
             const paletteNames = Object.keys(colorPalettes);
-            const paletteIndex = Math.floor(value * paletteNames.length);
-            const clampedIndex = Math.min(paletteIndex, paletteNames.length - 1);
-            node.params[paramName] = paletteNames[clampedIndex];
-          } else if (paramName === 'colorIndex') {
-            // Map 0-1 value to color index range (usually 0-12)
-            const maxIndex = 12;
-            node.params[paramName] = value * maxIndex;
+            const paletteIndex = Math.floor(value) % paletteNames.length;
+            node.params[paramName] = paletteNames[paletteIndex];
           } else if (paramName === 'blendMode') {
-            // Map 0-1 value to blend modes
+            // For blend modes, use value as index
             const blendModes = ['Normal', 'Multiply', 'Screen', 'Overlay'];
-            const modeIndex = Math.floor(value * blendModes.length);
-            const clampedIndex = Math.min(modeIndex, blendModes.length - 1);
-            node.params[paramName] = blendModes[clampedIndex];
+            const modeIndex = Math.floor(value) % blendModes.length;
+            node.params[paramName] = blendModes[modeIndex];
           } else if (typeof node.params[paramName] === 'number') {
-            // Handle numeric parameters
-            let scaledValue = value;
-
-            // Scale based on parameter type
-            if (paramName === 'rotation') {
-              scaledValue = value * 360; // 0-360 degrees
-            } else if (paramName === 'positionX' || paramName === 'positionY') {
-              scaledValue = (value - 0.5) * 2; // -1 to 1 range
-            } else if (paramName === 'scaleX' || paramName === 'scaleY') {
-              scaledValue = value * 3; // 0-3 range
-            } else if (paramName === 'frequency') {
-              scaledValue = value * 50; // 0-50 range
-            } else if (paramName === 'slices') {
-              scaledValue = Math.floor(value * 12) + 1; // 1-12 range
+            // For numeric parameters, use the value directly
+            const paramDef = PARAMETER_CONSTRAINTS[paramName];
+            
+            if (paramDef) {
+              // Clamp to parameter's min/max range
+              let clampedValue = value;
+              if (paramDef.min !== undefined) {
+                clampedValue = Math.max(paramDef.min, clampedValue);
+              }
+              if (paramDef.max !== undefined) {
+                clampedValue = Math.min(paramDef.max, clampedValue);
+              }
+              
+              // For integer parameters, round to nearest integer
+              if (paramDef.type === 'integer') {
+                clampedValue = Math.round(clampedValue);
+              }
+              
+              node.params[paramName] = clampedValue;
+              
+              // Debug logging
+              if (paramName === 'slices' && value !== clampedValue) {
+                Logger.debug(`Slices clamped: ${value} → ${clampedValue}`);
+              }
+            } else {
+              // No constraints defined, use value directly
+              node.params[paramName] = value;
             }
-
-            // Apply the scaled value to the parameter
-            node.params[paramName] = scaledValue;
           }
         }
       }
@@ -6565,6 +7468,10 @@ function setNodeUniforms(node) {
           gl.uniform1f(loc, value * Math.PI / 180);
         } else {
           gl.uniform1f(loc, value);
+          // Debug logging for slices
+          if (key === 'slices' && node.type === 'Kaleidoscope') {
+            Logger.debug(`Setting kaleidoscope slices uniform: ${value}`);
+          }
         }
       } else if (typeof value === 'boolean') {
         gl.uniform1i(loc, value ? 1 : 0);
@@ -6911,8 +7818,9 @@ function fitGraphToView() {
     const col = index % cols;
     const row = Math.floor(index / cols);
 
-    node.x = 50 + col * 250;
-    node.y = 50 + row * 150;
+    // Increased spacing for better visibility
+    node.x = 80 + col * 300;  // Increased from 250 to 300
+    node.y = 80 + row * 200;  // Increased from 150 to 200
 
     if (node.element) {
       node.element.style.left = node.x + 'px';
@@ -6998,9 +7906,8 @@ function handleMIDIMessage(msg) {
     // Handle control input mappings
     if (controlInputs.midi[ccNum]) {
       const mapping = controlInputs.midi[ccNum];
-      const normalizedValue = ccVal / 127;
-      const mappedValue = mapping.min + normalizedValue * (mapping.max - mapping.min);
-      applyControlInput(mapping.nodeId, mapping.param, mappedValue);
+      // Direct value from MIDI CC (0-127)
+      applyControlInput(mapping.nodeId, mapping.param, ccVal);
     }
 
     if (midiMappings[ccNum]) {
@@ -7119,8 +8026,8 @@ function analyzeAudio() {
         bandValue = audioBands[bandName]?.value || 0;
       }
 
-      const mappedValue = mapping.min + bandValue * (mapping.max - mapping.min);
-      applyControlInput(mapping.nodeId, mapping.param, mappedValue);
+      // Direct value from audio analysis (already normalized 0-1)
+      applyControlInput(mapping.nodeId, mapping.param, bandValue);
     });
   });
 
@@ -7227,23 +8134,39 @@ function startAudioAnalysis() {
 function applyControlInput(nodeId, paramName, value) {
   const node = nodes.find(n => n.id === nodeId);
   if (node && node.params.hasOwnProperty(paramName)) {
-    // Special handling for string parameters
+    // Get parameter constraints to determine the type
+    const constraints = getParameterConstraints(paramName);
+    
+    // Apply the value directly - what the control outputs is what gets applied
     if (paramName === 'colorPalette') {
-      // Map 0-1 audio value to available color palettes
+      // For discrete string parameters, round to nearest integer index
       const paletteNames = Object.keys(colorPalettes);
-      const index = Math.floor(value * paletteNames.length);
-      const clampedIndex = Math.min(index, paletteNames.length - 1);
+      const index = Math.round(value);
+      const clampedIndex = Math.max(0, Math.min(index, paletteNames.length - 1));
       node.params[paramName] = paletteNames[clampedIndex];
+    } else if (constraints && constraints.type === 'integer') {
+      // For integer parameters, round the value
+      node.params[paramName] = Math.round(value);
+    } else if (constraints && constraints.type === 'boolean') {
+      // For boolean parameters, treat > 0.5 as true
+      node.params[paramName] = value > 0.5;
+    } else if (constraints && constraints.values) {
+      // For discrete enum parameters, round to nearest index
+      const values = constraints.values;
+      const index = Math.round(value);
+      const clampedIndex = Math.max(0, Math.min(index, values.length - 1));
+      node.params[paramName] = values[clampedIndex];
     } else {
-      // Normal numeric parameter
+      // For continuous numeric parameters, use the value directly
       node.params[paramName] = value;
     }
+    
     updateNodeProperties(node); // Refresh UI if node is selected
 
-    // Save state for MIDI parameter changes
+    // Save state for parameter changes
     clearTimeout(parameterChangeTimeout);
     parameterChangeTimeout = setTimeout(() => {
-      saveState(`MIDI Change ${paramName}`);
+      saveState(`Control Change ${paramName}`);
     }, 1000);
   }
 }
@@ -7377,8 +8300,8 @@ function updateColorComponents() {
     const componentValue = colorComponents[componentName]?.value || 0;
 
     mappings.forEach(mapping => {
-      const mappedValue = mapping.min + componentValue * (mapping.max - mapping.min);
-      applyControlInput(mapping.nodeId, mapping.param, mappedValue);
+      // Direct value from color component
+      applyControlInput(mapping.nodeId, mapping.param, componentValue);
     });
   });
 }
@@ -7488,8 +8411,8 @@ function applyCursorMappings() {
     const componentValue = cursorComponents[componentName]?.value || 0;
 
     mappings.forEach(mapping => {
-      const mappedValue = mapping.min + componentValue * (mapping.max - mapping.min);
-      applyControlInput(mapping.nodeId, mapping.param, mappedValue);
+      // Direct value from color component
+      applyControlInput(mapping.nodeId, mapping.param, componentValue);
     });
   });
 }
@@ -7504,6 +8427,292 @@ function applyCursorMappings() {
 function initCamera() {
   // Camera controls are now integrated into individual CameraInput node properties
   // No global camera section needed anymore
+}
+
+/**
+ * Initialize gamepad support
+ */
+function initGamepad() {
+  // Check for gamepad API support
+  if (!navigator.getGamepads) {
+    Logger.warn('Gamepad API not supported');
+    return;
+  }
+
+  // Listen for gamepad connection events
+  window.addEventListener('gamepadconnected', (e) => {
+    Logger.info(`Gamepad connected: ${e.gamepad.id}`);
+    gamepadState.controllers[e.gamepad.index] = e.gamepad;
+    updateGamepadStatus();
+  });
+
+  window.addEventListener('gamepaddisconnected', (e) => {
+    Logger.info(`Gamepad disconnected: ${e.gamepad.id}`);
+    delete gamepadState.controllers[e.gamepad.index];
+    updateGamepadStatus();
+  });
+  
+  // Chrome requires a user gesture to enable gamepad API
+  // Add click handler to detect controllers
+  document.addEventListener('click', () => {
+    if (!gamepadState.scanning) {
+      gamepadState.scanning = true;
+      const gamepads = navigator.getGamepads();
+      for (let i = 0; i < gamepads.length; i++) {
+        if (gamepads[i]) {
+          if (!gamepadState.controllers[i]) {
+            Logger.info(`Gamepad detected after user interaction: ${gamepads[i].id}`);
+            gamepadState.controllers[i] = gamepads[i];
+            updateGamepadStatus();
+          }
+        }
+      }
+    }
+  }, { once: false });
+}
+
+/**
+ * Start polling for gamepad state
+ */
+function startGamepadPolling() {
+  if (gamepadState.pollInterval) return;
+  
+  // Chrome requires user interaction before gamepad API works
+  // Poll more frequently and check for new connections
+  gamepadState.pollInterval = setInterval(() => {
+    // Get current gamepad states
+    const gamepads = navigator.getGamepads();
+    let hasActiveController = false;
+    
+    for (let i = 0; i < gamepads.length; i++) {
+      const gamepad = gamepads[i];
+      if (!gamepad) continue;
+      
+      hasActiveController = true;
+      
+      // Check if this is a new connection
+      if (!gamepadState.controllers[i]) {
+        Logger.info(`Gamepad detected: ${gamepad.id}`);
+        gamepadState.controllers[i] = gamepad;
+        updateGamepadStatus();
+      }
+      
+      // Update stored state
+      gamepadState.controllers[i] = gamepad;
+      
+      // Update component values
+      updateGamepadComponents(gamepad);
+    }
+    
+    // Check for disconnections
+    Object.keys(gamepadState.controllers).forEach(index => {
+      if (!gamepads[index]) {
+        delete gamepadState.controllers[index];
+        updateGamepadStatus();
+      }
+    });
+  }, 16); // ~60fps polling
+}
+
+/**
+ * Update gamepad component values
+ */
+function updateGamepadComponents(gamepad) {
+  // Update button states
+  gamepad.buttons.forEach((button, index) => {
+    const componentKey = `button${index}`;
+    if (controllerComponents[componentKey]) {
+      // For buttons, value is pressure-sensitive (0-1)
+      controllerComponents[componentKey].value = button.value;
+    }
+  });
+  
+  // Update axis states
+  gamepad.axes.forEach((axis, index) => {
+    const componentKey = `axis${index}`;
+    if (controllerComponents[componentKey]) {
+      // Axes range from -1 to 1, normalize to 0-1
+      controllerComponents[componentKey].value = (axis + 1) / 2;
+    }
+  });
+  
+  // Update visualization if a GameControllerInput node is selected
+  if (selectedNode && selectedNode.type === 'GameControllerInput') {
+    updateControllerVisualization(gamepad);
+  }
+}
+
+/**
+ * Update controller visualization in real-time
+ */
+function updateControllerVisualization(gamepad) {
+  if (!gamepad) return;
+  
+  const vizContainer = document.querySelector('.controller-visualization');
+  if (!vizContainer || !selectedNode) return;
+  
+  // Update button states
+  gamepad.buttons.forEach((button, index) => {
+    const buttonEl = vizContainer.querySelector(`[data-button="${index}"]`);
+    if (buttonEl) {
+      if (button.pressed) {
+        buttonEl.classList.add('pressed');
+      } else {
+        buttonEl.classList.remove('pressed');
+      }
+      
+      // Update trigger opacity
+      if (index === 6 || index === 7) {
+        buttonEl.style.opacity = 0.3 + button.value * 0.7;
+      }
+    }
+  });
+  
+  // Update stick positions
+  const leftStick = vizContainer.querySelector('.stick-container:first-child .stick-position');
+  if (leftStick) {
+    leftStick.style.transform = `translate(${gamepad.axes[0] * 15}px, ${gamepad.axes[1] * 15}px)`;
+    if (selectedNode.params.component === 'axis0' || selectedNode.params.component === 'axis1') {
+      leftStick.classList.add('active');
+    } else {
+      leftStick.classList.remove('active');
+    }
+  }
+  
+  const rightStick = vizContainer.querySelector('.stick-container:last-child .stick-position');
+  if (rightStick) {
+    rightStick.style.transform = `translate(${gamepad.axes[2] * 15}px, ${gamepad.axes[3] * 15}px)`;
+    if (selectedNode.params.component === 'axis2' || selectedNode.params.component === 'axis3') {
+      rightStick.classList.add('active');
+    } else {
+      rightStick.classList.remove('active');
+    }
+  }
+  
+  // Highlight selected component
+  const selectedComponent = selectedNode.params.component;
+  vizContainer.querySelectorAll('[data-button]').forEach(el => {
+    el.classList.remove('selected-input');
+  });
+  
+  if (selectedComponent.startsWith('button')) {
+    const buttonIndex = parseInt(selectedComponent.substring(6));
+    const selectedButton = vizContainer.querySelector(`[data-button="${buttonIndex}"]`);
+    if (selectedButton) {
+      selectedButton.classList.add('selected-input');
+    }
+  }
+}
+
+/**
+ * Update gamepad connection status UI
+ */
+function updateGamepadStatus() {
+  const connectedCount = Object.keys(gamepadState.controllers).length;
+  
+  // Update any GameControllerInput nodes
+  nodes.forEach(node => {
+    if (node.type === 'GameControllerInput' && node.element) {
+      const statusEl = node.element.querySelector('.controller-status');
+      if (statusEl) {
+        statusEl.textContent = connectedCount > 0 ? '🎮' : '⚠️';
+        statusEl.title = connectedCount > 0 ? 
+          `${connectedCount} controller(s) connected` : 
+          'No controllers connected';
+      }
+    }
+  });
+  
+  // Update properties panel if a GameControllerInput node is selected
+  if (selectedNode && selectedNode.type === 'GameControllerInput') {
+    updatePropertiesPanel(selectedNode);
+  }
+  
+  // Update permission UI if needed
+  updatePermissionUI();
+}
+
+/**
+ * Create controller visualization HTML
+ */
+function createControllerVisualization(gamepad, selectedComponent) {
+  if (!gamepad) return '';
+  
+  let html = '<div class="controller-viz-container">';
+  
+  // D-Pad and face buttons container
+  html += '<div class="controller-main">';
+  
+  // Left side - D-Pad
+  html += '<div class="controller-dpad">';
+  html += `<div class="dpad-button dpad-up ${gamepad.buttons[12]?.pressed ? 'pressed' : ''}" data-button="12">↑</div>`;
+  html += `<div class="dpad-button dpad-left ${gamepad.buttons[14]?.pressed ? 'pressed' : ''}" data-button="14">←</div>`;
+  html += `<div class="dpad-button dpad-right ${gamepad.buttons[15]?.pressed ? 'pressed' : ''}" data-button="15">→</div>`;
+  html += `<div class="dpad-button dpad-down ${gamepad.buttons[13]?.pressed ? 'pressed' : ''}" data-button="13">↓</div>`;
+  html += '</div>';
+  
+  // Center - Sticks
+  html += '<div class="controller-sticks">';
+  
+  // Left stick
+  html += '<div class="stick-container">';
+  html += '<div class="stick-base">';
+  const leftX = gamepad.axes[0] || 0;
+  const leftY = gamepad.axes[1] || 0;
+  html += `<div class="stick-position ${selectedComponent === 'axis0' || selectedComponent === 'axis1' ? 'active' : ''}" 
+           style="transform: translate(${leftX * 15}px, ${leftY * 15}px);"></div>`;
+  html += '</div>';
+  html += '<div class="stick-label">L</div>';
+  html += '</div>';
+  
+  // Right stick
+  html += '<div class="stick-container">';
+  html += '<div class="stick-base">';
+  const rightX = gamepad.axes[2] || 0;
+  const rightY = gamepad.axes[3] || 0;
+  html += `<div class="stick-position ${selectedComponent === 'axis2' || selectedComponent === 'axis3' ? 'active' : ''}" 
+           style="transform: translate(${rightX * 15}px, ${rightY * 15}px);"></div>`;
+  html += '</div>';
+  html += '<div class="stick-label">R</div>';
+  html += '</div>';
+  
+  html += '</div>';
+  
+  // Right side - Face buttons
+  html += '<div class="controller-face-buttons">';
+  html += `<div class="face-button button-y ${gamepad.buttons[3]?.pressed ? 'pressed' : ''}" data-button="3">Y</div>`;
+  html += `<div class="face-button button-x ${gamepad.buttons[2]?.pressed ? 'pressed' : ''}" data-button="2">X</div>`;
+  html += `<div class="face-button button-b ${gamepad.buttons[1]?.pressed ? 'pressed' : ''}" data-button="1">B</div>`;
+  html += `<div class="face-button button-a ${gamepad.buttons[0]?.pressed ? 'pressed' : ''}" data-button="0">A</div>`;
+  html += '</div>';
+  
+  html += '</div>';
+  
+  // Shoulders and triggers
+  html += '<div class="controller-shoulders">';
+  html += `<div class="shoulder-button lb ${gamepad.buttons[4]?.pressed ? 'pressed' : ''}" data-button="4">LB</div>`;
+  html += `<div class="trigger lt ${gamepad.buttons[6]?.pressed ? 'pressed' : ''}" data-button="6" 
+           style="opacity: ${0.3 + gamepad.buttons[6]?.value * 0.7};">LT</div>`;
+  html += `<div class="trigger rt ${gamepad.buttons[7]?.pressed ? 'pressed' : ''}" data-button="7" 
+           style="opacity: ${0.3 + gamepad.buttons[7]?.value * 0.7};">RT</div>`;
+  html += `<div class="shoulder-button rb ${gamepad.buttons[5]?.pressed ? 'pressed' : ''}" data-button="5">RB</div>`;
+  html += '</div>';
+  
+  // Center buttons
+  html += '<div class="controller-center-buttons">';
+  html += `<div class="center-button select ${gamepad.buttons[8]?.pressed ? 'pressed' : ''}" data-button="8">SEL</div>`;
+  html += `<div class="center-button start ${gamepad.buttons[9]?.pressed ? 'pressed' : ''}" data-button="9">START</div>`;
+  html += '</div>';
+  
+  // Highlight selected component
+  if (selectedComponent.startsWith('button')) {
+    const buttonIndex = parseInt(selectedComponent.substring(6));
+    html = html.replace(`data-button="${buttonIndex}"`, `data-button="${buttonIndex}" class="selected-input"`);
+  }
+  
+  html += '</div>';
+  
+  return html;
 }
 
 /**
@@ -7599,7 +8808,7 @@ function updateExistingControlInputs() {
 function createControlInputNode(type) {
   try {
     // Validate type
-    const validTypes = ['MIDIInput', 'AudioInput', 'CursorInput', 'CameraInput', 'RandomInput', 'RangeInput'];
+    const validTypes = ['MIDIInput', 'AudioInput', 'CursorInput', 'CameraInput', 'GameControllerInput', 'RandomInput', 'RangeInput'];
     if (!validTypes.includes(type)) {
       throw new Error(`Invalid control input type: ${type}`);
     }
@@ -7640,7 +8849,9 @@ function getControlInputTypeLabel(type) {
     'AudioInput': 'Audio Analysis',
     'CursorInput': 'Mouse/Cursor',
     'CameraInput': 'Camera Motion',
-    'RandomInput': 'Random Generator'
+    'GameControllerInput': 'Game Controller',
+    'RandomInput': 'Random Generator',
+    'RangeInput': 'Range/Increment'
   };
   return labels[type] || type;
 }
@@ -7663,8 +8874,13 @@ function setControlInputStatus(message, type = '') {
  * Enable camera input
  */
 async function enableCameraInput() {
+  if (permissions.camera.granted) {
+    return true;
+  }
 
   try {
+    permissions.camera.requested = true;
+    updatePermissionUI();
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { width: 320, height: 240 } // Low resolution for analysis
     });
@@ -7786,8 +9002,8 @@ function applyCameraMappings() {
     const componentValue = cameraComponents[componentName]?.value || 0;
 
     mappings.forEach(mapping => {
-      const mappedValue = mapping.min + componentValue * (mapping.max - mapping.min);
-      applyControlInput(mapping.nodeId, mapping.param, mappedValue);
+      // Direct value from color component
+      applyControlInput(mapping.nodeId, mapping.param, componentValue);
     });
   });
 }
@@ -8234,25 +9450,11 @@ function deserializeProject(projectData) {
     updateProjectTitle();
 
     // Final verification of main output consistency
-    const dropdown = document.getElementById('main-output-select');
-    const dropdownValue = dropdown?.value;
-    const dropdownNodeId = dropdownValue ? parseInt(dropdownValue) : null;
-    const actualMainOutputId = mainOutputNode?.id;
-
-    // Handle empty dropdown value (happens during undo/redo)
-    if (!dropdownValue || isNaN(dropdownNodeId)) {
-      Logger.warn('Main output dropdown has invalid value during undo/redo, fixing...');
+    // The Canvas node is always the main output, dropdown shows what's connected to it
+    const canvasNode = nodes.find(n => n.type === 'FinalOutput');
+    if (canvasNode) {
       updateMainOutputDropdown();
-    } else if (dropdownNodeId !== actualMainOutputId) {
-      Logger.error('Main output sync error detected!', {
-        dropdown: dropdownNodeId,
-        actual: actualMainOutputId,
-        mainOutputNode: mainOutputNode?.name
-      });
-      // Force sync by calling setMainOutput again
-      setMainOutput(mainOutputNode);
-    } else {
-      Logger.info('Main output sync verified:', mainOutputNode?.name, `(ID: ${actualMainOutputId})`);
+      Logger.debug('Updated main output dropdown after project load');
     }
 
     hasUnsavedChanges = false;
@@ -8702,22 +9904,9 @@ function restoreAutosavedProject() {
     deserializeProject(autosaveData.project);
     Logger.info(`Restored autosaved project with ${nodes.length} nodes`);
 
-    // Verify main output consistency after restoration
-    const dropdown = document.getElementById('main-output-select');
-    const dropdownNodeId = parseInt(dropdown.value);
-    const actualMainOutputId = mainOutputNode?.id;
-
-    if (dropdownNodeId !== actualMainOutputId) {
-      Logger.error('Main output sync error after autosave restoration!', {
-        dropdown: dropdownNodeId,
-        actual: actualMainOutputId,
-        mainOutputNode: mainOutputNode?.name
-      });
-      // Force sync
-      setMainOutput(mainOutputNode);
-    } else {
-      Logger.info('Main output sync verified after autosave restoration:', mainOutputNode?.name);
-    }
+    // Update main output dropdown after restoration
+    updateMainOutputDropdown();
+    Logger.debug('Updated main output dropdown after autosave restoration');
 
     // Restore unsaved status
     hasUnsavedChanges = autosaveData.wasUnsaved;
@@ -8758,22 +9947,9 @@ function restoreLastProject() {
     deserializeProject(lastProjectData.project);
     Logger.info(`Restored project with ${nodes.length} nodes`);
 
-    // Verify main output consistency after restoration
-    const dropdown = document.getElementById('main-output-select');
-    const dropdownNodeId = parseInt(dropdown.value);
-    const actualMainOutputId = mainOutputNode?.id;
-
-    if (dropdownNodeId !== actualMainOutputId) {
-      Logger.error('Main output sync error after restoration!', {
-        dropdown: dropdownNodeId,
-        actual: actualMainOutputId,
-        mainOutputNode: mainOutputNode?.name
-      });
-      // Force sync
-      setMainOutput(mainOutputNode);
-    } else {
-      Logger.info('Main output sync verified after restoration:', mainOutputNode?.name);
-    }
+    // Update main output dropdown after restoration
+    updateMainOutputDropdown();
+    Logger.debug('Updated main output dropdown after project restoration');
 
     // Restore unsaved status
     hasUnsavedChanges = lastProjectData.wasUnsaved;
