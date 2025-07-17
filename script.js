@@ -1400,7 +1400,19 @@ class SynthNode {
       this.params = { ...config.params };
       this.icon = config.icon;
       this.category = config.category;
-      this.program = programs[this.type.toLowerCase()];
+      // Handle program assignment with proper case handling
+      let programName = this.type.toLowerCase();
+      
+      // Special cases for compound names
+      if (this.type === 'RadialGradient') programName = 'radialgradient';
+      if (this.type === 'FlowField') programName = 'flowfield';
+      if (this.type === 'VideoInput') programName = 'videoinput';
+      if (this.type === 'NoiseDisplace') programName = 'noisedisplace';
+      if (this.type === 'PolarWarp') programName = 'polarwarp';
+      if (this.type === 'RGBSplit') programName = 'rgbsplit';
+      if (this.type === 'FeedbackTrail') programName = 'feedbacktrail';
+      
+      this.program = programs[programName];
 
       // Initialize Random nodes with a random value
       if (this.type === 'RandomInput') {
@@ -7865,27 +7877,19 @@ function renderNode(node, time) {
   
   // Special post-processing for FeedbackTrail
   if (node.type === 'FeedbackTrail') {
-    // Copy current output to feedback buffer
-    gl.bindFramebuffer(gl.FRAMEBUFFER, node.feedbackFbo);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    
-    gl.useProgram(programs.copy);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, node.texture);
-    const texLoc = gl.getUniformLocation(programs.copy, 'u_texture');
-    if (texLoc) gl.uniform1i(texLoc, 0);
-    
-    bindQuad();
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, quadBuffer.numItems);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    
-    // Set feedback texture uniform for next frame
-    const feedbackLoc = gl.getUniformLocation(node.program, 'u_feedbackTexture');
-    if (feedbackLoc) {
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, node.feedbackTexture);
-      gl.uniform1i(feedbackLoc, 1);
+    // Ensure feedback buffer exists
+    if (!node.feedbackTexture) {
+      node.feedbackTexture = createTexture();
+      node.feedbackFbo = createFramebuffer(node.feedbackTexture);
     }
+    
+    // Swap buffers: current output becomes next frame's feedback
+    const tempTex = node.feedbackTexture;
+    const tempFbo = node.feedbackFbo;
+    node.feedbackTexture = node.texture;
+    node.feedbackFbo = node.fbo;
+    node.texture = tempTex;
+    node.fbo = tempFbo;
   }
 }
 
@@ -8269,6 +8273,16 @@ function bindNodeInputTextures(node) {
       }
     }
   });
+  
+  // Special handling for FeedbackTrail's feedback texture
+  if (node.type === 'FeedbackTrail' && node.feedbackTexture) {
+    const feedbackLoc = gl.getUniformLocation(node.program, 'u_feedbackTexture');
+    if (feedbackLoc) {
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, node.feedbackTexture);
+      gl.uniform1i(feedbackLoc, 1);
+    }
+  }
 }
 
 /**
