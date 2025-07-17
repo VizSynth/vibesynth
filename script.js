@@ -4612,11 +4612,8 @@ function setTextureParams() {
 }
 
 function setupCameraNode(node) {
-  // Create texture for webcam video
-  node.texture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, node.texture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
-  setTextureParams();
+  // Allocate FBO like other nodes
+  allocateNodeFBO(node);
   
   // Create video element
   node.video = document.createElement('video');
@@ -4633,11 +4630,8 @@ function setupCameraNode(node) {
 }
 
 function setupVideoFileNode(node) {
-  // Create texture for video file
-  node.texture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, node.texture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
-  setTextureParams();
+  // Allocate FBO like other nodes
+  allocateNodeFBO(node);
   
   // Create video element
   node.video = document.createElement('video');
@@ -7790,7 +7784,7 @@ function renderNode(node, time) {
     return;
   }
 
-  if (!node.program && node.type !== 'Video' && node.category !== 'input') {
+  if (!node.program && node.type !== 'Camera' && node.type !== 'VideoFileInput' && node.category !== 'input') {
     Logger.warn(`SKIPPING ${node.name} (${node.type}): No program assigned`);
     return;
   }
@@ -7821,29 +7815,55 @@ function renderNode(node, time) {
 
   if (node.type === 'Camera') {
     if (node.video && node.video.readyState === node.video.HAVE_ENOUGH_DATA) {
+      // Update the node's texture with the current video frame
       gl.bindTexture(gl.TEXTURE_2D, node.texture);
       try {
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, node.video);
         setTextureParams();
       } catch(e) {
         // Handle video texture errors
+        Logger.error('Camera texture update error:', e);
       }
     }
-    return;
+    
+    // Set up the shader to render this texture
+    if (node.program) {
+      gl.useProgram(node.program);
+      const texLoc = gl.getUniformLocation(node.program, 'u_texture');
+      if (texLoc) {
+        gl.uniform1i(texLoc, 0);
+      }
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, node.texture);
+    }
+    // Continue to render normally
   }
   
   // Handle VideoFileInput node - upload video frame as texture
   if (node.type === 'VideoFileInput') {
     if (node.video && node.video.readyState === node.video.HAVE_ENOUGH_DATA) {
+      // Update the node's texture with the current video frame
       gl.bindTexture(gl.TEXTURE_2D, node.texture);
       try {
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, node.video);
         setTextureParams();
       } catch(e) {
         // Handle video texture errors
+        Logger.error('VideoFileInput texture update error:', e);
       }
     }
-    return;
+    
+    // Set up the shader to render this texture
+    if (node.program) {
+      gl.useProgram(node.program);
+      const texLoc = gl.getUniformLocation(node.program, 'u_texture');
+      if (texLoc) {
+        gl.uniform1i(texLoc, 0);
+      }
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, node.texture);
+    }
+    // Continue to render normally
   }
   
   // Handle Text node - render text to canvas then upload as texture
@@ -9747,7 +9767,10 @@ async function enableCameraInput() {
  * Enable webcam for a specific camera node
  */
 async function enableWebcamForNode(node) {
-  if (!node.video) return;
+  if (!node.video) {
+    Logger.error('No video element on node:', node.name);
+    return;
+  }
   
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -9760,16 +9783,25 @@ async function enableWebcamForNode(node) {
     node.video.srcObject = stream;
     node.stream = stream;
     
+    // Ensure video plays
+    await node.video.play();
+    
     // Update permissions
     permissions.camera.granted = true;
     permissions.camera.requested = true;
     updatePermissionUI();
     
     Logger.info(`Webcam enabled for node: ${node.name}`);
+    
+    // Force a re-render to show the video
+    if (selectedNode === node) {
+      showNodeProperties(node);
+    }
   } catch (error) {
     Logger.error(`Failed to enable webcam for node ${node.name}:`, error);
     permissions.camera.denied = true;
     updatePermissionUI();
+    throw error; // Re-throw so the button handler can show the error
   }
 }
 
