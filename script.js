@@ -2464,6 +2464,10 @@ function compileShaders() {
   // Camera shader - uses text shader (simple texture pass-through)
   programs.camera = programs.text;
   
+  if (!programs.camera) {
+    Logger.error('Failed to assign Camera shader program');
+  }
+  
   // CameraInput shader - for control input nodes
   programs.camerainput = programs.copy;
 
@@ -4613,13 +4617,26 @@ function setTextureParams() {
 
 function setupCameraNode(node) {
   // Allocate FBO like other nodes
-  allocateNodeFBO(node);
+  const fboResult = allocateNodeFBO(node);
+  if (!fboResult) {
+    Logger.error(`Failed to allocate FBO for Camera node ${node.name}`);
+    return false;
+  }
   
   // Create video element
   node.video = document.createElement('video');
   node.video.autoplay = true;
   node.video.playsInline = true;
   node.video.muted = true;
+  
+  // Mark node as not ready until video is initialized
+  node.videoReady = false;
+  
+  // Set up video ready handler
+  node.video.addEventListener('loadedmetadata', () => {
+    Logger.debug(`Camera node ${node.name}: Video metadata loaded`);
+    node.videoReady = true;
+  });
   
   // Setup webcam when permission is granted
   if (cameraEnabled) {
@@ -7784,7 +7801,14 @@ function renderNode(node, time) {
     return;
   }
 
-  if (!node.program && node.type !== 'Camera' && node.type !== 'VideoFileInput' && node.category !== 'input') {
+  // Skip Camera/VideoFileInput nodes if video isn't ready yet - do this EARLY before any GL state changes
+  if ((node.type === 'Camera' || node.type === 'VideoFileInput') && 
+      (!node.video || node.video.readyState !== node.video.HAVE_ENOUGH_DATA)) {
+    Logger.trace(`${node.type} node ${node.name}: Video not ready, skipping render early`);
+    return;
+  }
+
+  if (!node.program && node.category !== 'input') {
     Logger.warn(`SKIPPING ${node.name} (${node.type}): No program assigned`);
     return;
   }
@@ -7814,6 +7838,21 @@ function renderNode(node, time) {
   }
 
   if (node.type === 'Camera' || node.type === 'VideoFileInput') {
+    // Debug logging for Camera nodes
+    if (node.type === 'Camera') {
+      Logger.debug(`Camera node ${node.name} state:`, {
+        hasVideo: !!node.video,
+        videoReady: node.video?.readyState === node.video?.HAVE_ENOUGH_DATA,
+        hasTexture: !!node.texture,
+        textureValid: node.texture && gl.isTexture(node.texture),
+        hasProgram: !!node.program,
+        programValid: node.program && gl.isProgram(node.program),
+        hasFBO: !!node.fbo,
+        fboValid: node.fbo && gl.isFramebuffer(node.fbo)
+      });
+    }
+    
+    
     if (node.video && node.video.readyState === node.video.HAVE_ENOUGH_DATA && node.texture) {
       // Validate texture before use
       if (!gl.isTexture(node.texture)) {
@@ -7954,6 +7993,17 @@ function renderNode(node, time) {
     });
   }
 
+  // Validate program before use
+  if (!node.program) {
+    Logger.error(`No program assigned to ${node.name} (${node.type})`);
+    return;
+  }
+  
+  if (!gl.isProgram(node.program)) {
+    Logger.error(`Invalid program for ${node.name} (${node.type})`);
+    return;
+  }
+
   gl.useProgram(node.program);
 
   // Set common uniforms
@@ -8079,8 +8129,21 @@ function renderNode(node, time) {
     // Additional debug info for GL_INVALID_OPERATION
     if (error === 1282) {
       Logger.debug(`  Program valid: ${!!node.program}`);
+      Logger.debug(`  Program is WebGL program: ${node.program && gl.isProgram(node.program)}`);
+      Logger.debug(`  Current program: ${gl.getParameter(gl.CURRENT_PROGRAM)}`);
       Logger.debug(`  Texture valid: ${!!node.texture && gl.isTexture(node.texture)}`);
       Logger.debug(`  FBO valid: ${!!node.fbo && gl.isFramebuffer(node.fbo)}`);
+      Logger.debug(`  Quad buffer valid: ${!!quadBuffer.buf && gl.isBuffer(quadBuffer.buf)}`);
+      
+      // Check vertex attrib state
+      const currentProgram = gl.getParameter(gl.CURRENT_PROGRAM);
+      if (currentProgram) {
+        const posLoc = gl.getAttribLocation(currentProgram, "a_position");
+        Logger.debug(`  a_position location: ${posLoc}`);
+        if (posLoc !== -1) {
+          Logger.debug(`  Vertex attrib ${posLoc} enabled: ${gl.getVertexAttrib(posLoc, gl.VERTEX_ATTRIB_ARRAY_ENABLED)}`);
+        }
+      }
     }
   }
 
@@ -8551,7 +8614,24 @@ function nodeHasDependency(node, targetNode, visited = new Set()) {
 }
 
 function bindQuad() {
-  const posLoc = gl.getAttribLocation(gl.getParameter(gl.CURRENT_PROGRAM), "a_position");
+  // Check if quad buffer exists
+  if (!quadBuffer.buf) {
+    Logger.error('bindQuad called but quadBuffer not initialized');
+    return;
+  }
+  
+  const currentProgram = gl.getParameter(gl.CURRENT_PROGRAM);
+  if (!currentProgram) {
+    Logger.error('bindQuad called with no active shader program');
+    return;
+  }
+  
+  const posLoc = gl.getAttribLocation(currentProgram, "a_position");
+  if (posLoc === -1) {
+    Logger.error('a_position attribute not found in current shader program');
+    return;
+  }
+  
   gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer.buf);
   gl.enableVertexAttribArray(posLoc);
   gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
