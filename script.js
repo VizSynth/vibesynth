@@ -1326,7 +1326,7 @@ class SynthNode {
         inputs: [null],
         controlInputs: [null, null], // decay, blur
         params: { decay: 0.92, blur: 2 },
-        icon: 'motion_blur',
+        icon: 'history',
         category: 'effect'
       },
       Bloom: {

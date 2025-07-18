@@ -542,9 +542,20 @@ html, body {
   border-radius: var(--border-radius) var(--border-radius) 0 0;
 }
 
-.node-icon {
+/* Node & palette icons – constrain width so fallback text
+   like "motion_blur" can't push titles off-screen */
+.node-icon,
+.palette-node .material-icons {   /* covers both graph & sidebar */
   font-size: 16px;
   color: var(--accent-primary);
+
+  /* NEW – the actual fix */
+  width: 20px;            /* hard cap the box */
+  min-width: 20px;
+  display: inline-flex;   /* keep icon centered */
+  justify-content: center;
+  overflow: hidden;       /* hide any stray text */
+  flex-shrink: 0;         /* don't let it collapse either */
 }
 
 .node-title {
