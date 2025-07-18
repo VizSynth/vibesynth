@@ -4831,7 +4831,9 @@ function createNodeElement(node) {
       <span class="material-icons node-icon">${node.icon}</span>
       <span class="node-title">${node.name}</span>
       ${statusIndicator}
-      <div class="node-enabled ${node.enabled ? 'checked' : ''}"></div>
+      <div class="node-enabled ${node.enabled ? 'checked' : ''}">
+        ${node.enabled ? '<span class="material-icons">check</span>' : ''}
+      </div>
       ${node.category === 'system' ? '' : '<button class="node-delete">×</button>'}
     </div>
     <div class="node-body">
@@ -5319,6 +5321,13 @@ function createNodeElement(node) {
     node.enabled = !node.enabled;
     enableToggle.classList.toggle('checked', node.enabled);
     nodeEl.classList.toggle('disabled', !node.enabled);
+    
+    // Update the checkbox icon
+    if (node.enabled) {
+      enableToggle.innerHTML = '<span class="material-icons">check</span>';
+    } else {
+      enableToggle.innerHTML = '';
+    }
   });
 
   const deleteBtn = nodeEl.querySelector('.node-delete');
