@@ -8557,12 +8557,30 @@ function bindNodeInputTextures(node) {
   }
 
   // Special handling for Camera and VideoFileInput nodes - they use their own texture
-  if ((node.type === 'Camera' || node.type === 'VideoFileInput') && node.texture) {
+  if ((node.type === 'Camera' || node.type === 'VideoFileInput')) {
+    if (!node.texture || !gl.isTexture(node.texture)) {
+      Logger.error(`${node.type} has invalid or missing texture`);
+      return;
+    }
+    
+    Logger.debug(`${node.type} binding its own texture`);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, node.texture);
+    
+    // Check for texture binding errors
+    let error = gl.getError();
+    if (error !== gl.NO_ERROR) {
+      Logger.error(`${node.type} texture binding error:`, error);
+      return;
+    }
+    
     const texLoc = gl.getUniformLocation(node.program, 'u_texture');
+    Logger.debug(`${node.type} u_texture location: ${texLoc}`);
     if (texLoc !== null && texLoc !== -1) {
       gl.uniform1i(texLoc, 0);
+      Logger.debug(`${node.type} set u_texture uniform to texture unit 0`);
+    } else {
+      Logger.error(`${node.type} could not find u_texture uniform in shader`);
     }
     return; // Camera/VideoFileInput nodes don't have inputs
   }
