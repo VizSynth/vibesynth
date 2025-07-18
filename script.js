@@ -8128,6 +8128,19 @@ function renderNode(node, time) {
     
     if (node.type === 'Camera') {
       Logger.info(`Camera ${node.name} binding to FBO ${node.fbo}`);
+      
+      // Check texture attachment
+      const attachment = gl.getFramebufferAttachmentParameter(
+        gl.FRAMEBUFFER, 
+        gl.COLOR_ATTACHMENT0, 
+        gl.FRAMEBUFFER_ATTACHMENT_OBJECT_NAME
+      );
+      Logger.debug(`FBO COLOR_ATTACHMENT0 texture: ${attachment}`);
+      Logger.debug(`Node texture: ${node.texture}`);
+      
+      if (attachment === node.texture) {
+        Logger.warn(`Camera texture is attached to its own FBO - this could cause issues`);
+      }
     }
 
     // Check for framebuffer binding errors
@@ -8165,11 +8178,18 @@ function renderNode(node, time) {
     error = gl.getError();
   }
 
+  // Clear any errors before draw
+  while (gl.getError() !== gl.NO_ERROR) {}
+  
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, quadBuffer.numItems);
   
   // Log successful render for Camera nodes
   if (node.type === 'Camera' || node.type === 'VideoFileInput') {
     Logger.info(`${node.type} node ${node.name} rendered successfully to FBO`);
+    
+    // Check texture state
+    const currentTexture = gl.getParameter(gl.TEXTURE_BINDING_2D);
+    Logger.debug(`Current texture binding after draw: ${currentTexture}`);
   }
 
   // Check for errors after drawing
@@ -8556,9 +8576,19 @@ function bindNodeInputTextures(node) {
 
   // Special handling for Camera and VideoFileInput nodes - they use their own texture
   if ((node.type === 'Camera' || node.type === 'VideoFileInput')) {
+    Logger.info(`=== ${node.type} Texture Binding Debug ===`);
+    
     if (!node.texture || !gl.isTexture(node.texture)) {
       Logger.error(`${node.type} has invalid or missing texture`);
       return;
+    }
+    
+    // Check current program
+    const currentProgram = gl.getParameter(gl.CURRENT_PROGRAM);
+    Logger.debug(`Current program: ${currentProgram}, node.program: ${node.program}`);
+    
+    if (currentProgram !== node.program) {
+      Logger.error(`Program mismatch! Current: ${currentProgram}, Expected: ${node.program}`);
     }
     
     Logger.debug(`${node.type} binding its own texture`);
@@ -8576,10 +8606,19 @@ function bindNodeInputTextures(node) {
     Logger.debug(`${node.type} u_texture location: ${texLoc}`);
     if (texLoc !== null && texLoc !== -1) {
       gl.uniform1i(texLoc, 0);
-      Logger.debug(`${node.type} set u_texture uniform to texture unit 0`);
+      
+      // Check for uniform setting errors
+      error = gl.getError();
+      if (error !== gl.NO_ERROR) {
+        Logger.error(`${node.type} uniform setting error:`, error);
+      } else {
+        Logger.debug(`${node.type} set u_texture uniform to texture unit 0 successfully`);
+      }
     } else {
       Logger.error(`${node.type} could not find u_texture uniform in shader`);
     }
+    
+    Logger.info(`=== End ${node.type} Texture Binding ===`);
     return; // Camera/VideoFileInput nodes don't have inputs
   }
 
