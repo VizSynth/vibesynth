@@ -7809,12 +7809,19 @@ function renderFinalOutput() {
     return;
   }
 
-  Logger.debug(`Rendering final output from: ${connectedNode.name} (${connectedNode.type})`);
+  Logger.info(`Rendering final output from: ${connectedNode.name} (${connectedNode.type})`);
 
   // Validate connected node's texture
   if (!gl.isTexture(connectedNode.texture)) {
     Logger.error(`Connected node "${connectedNode.name}" has invalid texture`);
     return;
+  }
+  
+  // Special debugging for Camera nodes
+  if (connectedNode.type === 'Camera') {
+    Logger.info(`=== Final output rendering Camera ${connectedNode.name} ===`);
+    Logger.debug(`Camera texture: ${connectedNode.texture}`);
+    Logger.debug(`Texture is valid: ${gl.isTexture(connectedNode.texture)}`);
   }
 
   gl.useProgram(programs.copy);
@@ -7825,17 +7832,37 @@ function renderFinalOutput() {
   }
 
   gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, finalOutputNode.inputs[0].texture);
+  gl.bindTexture(gl.TEXTURE_2D, connectedNode.texture);
   bindQuad();
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, canvas.width, canvas.height);
+  
+  // Clear before drawing to see if anything renders
+  gl.clearColor(0.1, 0.1, 0.1, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, quadBuffer.numItems);
+  
+  // Check for errors
+  const error = gl.getError();
+  if (error !== gl.NO_ERROR) {
+    Logger.error(`Error rendering final output: ${error}`);
+  }
 }
 
 function renderNode(node, time) {
   // Skip deleted nodes
   if (node.deleted) {
     return;
+  }
+  
+  // Debug Camera nodes
+  if (node.type === 'Camera') {
+    Logger.info(`=== Starting Camera render for ${node.name} ===`);
+    Logger.debug(`Video element: ${!!node.video}`);
+    Logger.debug(`Video ready state: ${node.video?.readyState}`);
+    Logger.debug(`Has texture: ${!!node.texture}`);
+    Logger.debug(`Has program: ${!!node.program}`);
   }
 
   // Skip Camera/VideoFileInput nodes if video isn't ready yet - do this EARLY before any GL state changes
@@ -7891,7 +7918,7 @@ function renderNode(node, time) {
     
     
     if (node.video && node.video.readyState === node.video.HAVE_ENOUGH_DATA) {
-      Logger.debug(`${node.type} node ${node.name} ready to render with video`);
+      Logger.info(`${node.type} node ${node.name} ready to render with video`);
       
       // Check if we have a valid texture
       if (!node.texture || !gl.isTexture(node.texture)) {
