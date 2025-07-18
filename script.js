@@ -1011,6 +1011,43 @@ window.requestCameraPermission = async function() {
   }
 };
 
+window.enableCameraForNode = async function(nodeId) {
+  Logger.info(`enableCameraForNode called with nodeId: ${nodeId}`);
+  const node = nodes.find(n => n.id === nodeId);
+  Logger.info(`Found node:`, node ? {id: node.id, type: node.type, name: node.name} : 'null');
+  
+  if (node && node.type === 'Camera') {
+    try {
+      Logger.info(`Calling enableWebcamForNode for ${node.name}`);
+      await enableWebcamForNode(node);
+      
+      // Update the button on the node
+      const btn = node.element?.querySelector('.node-permission-btn');
+      if (btn) {
+        btn.textContent = 'Camera Active';
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+      }
+      // Update properties panel if this node is selected
+      if (selectedNode === node) {
+        showNodeProperties(node);
+      }
+      
+      Logger.info(`Camera successfully enabled for node ${node.name}`);
+    } catch (error) {
+      Logger.error('Failed to enable camera for node:', error);
+      // Update button to show error
+      const btn = node.element?.querySelector('.node-permission-btn');
+      if (btn) {
+        btn.textContent = 'Camera Denied';
+        btn.style.background = '#ef4444';
+      }
+    }
+  } else {
+    Logger.error(`Invalid node or not a Camera node: ${nodeId}`);
+  }
+};
+
 // Control input system
 const controlInputs = {
   midi: {},        // MIDI CC mappings: { ccNumber: { nodeId, param, min, max } }
@@ -4724,9 +4761,9 @@ function createNodeElement(node) {
         Enable Audio
       </button>
     `;
-  } else if (node.type === 'Camera' && !cameraEnabled && !permissions.camera.denied) {
+  } else if (node.type === 'Camera' && !node.stream && !permissions.camera.denied) {
     permissionButton = `
-      <button class="node-permission-btn" onclick="window.requestCameraPermission()" title="Enable camera access">
+      <button class="node-permission-btn" onclick="window.enableCameraForNode(${node.id})" title="Enable camera access">
         <span class="material-icons">videocam</span>
         Enable Camera
       </button>
@@ -9844,24 +9881,41 @@ async function enableCameraInput() {
  * Enable webcam for a specific camera node
  */
 async function enableWebcamForNode(node) {
+  Logger.info(`enableWebcamForNode called for node: ${node.name}`);
+  
   if (!node.video) {
     Logger.error('No video element on node:', node.name);
     return;
   }
   
+  Logger.info('Video element exists, requesting camera access...');
+  
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
+    const constraints = {
       video: { 
         width: { ideal: 1280 },
         height: { ideal: 720 }
       }
-    });
+    };
+    Logger.info('Calling getUserMedia with constraints:', constraints);
+    
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    
+    Logger.info('Got media stream:', stream);
+    Logger.info('Stream tracks:', stream.getTracks().map(t => ({kind: t.kind, enabled: t.enabled})));
     
     node.video.srcObject = stream;
     node.stream = stream;
     
+    Logger.info('Set video srcObject, attempting to play...');
+    
     // Ensure video plays
     await node.video.play();
+    
+    Logger.info('Video playing successfully');
+    
+    // Mark video as ready
+    node.videoReady = true;
     
     // Update permissions
     permissions.camera.granted = true;
@@ -9876,6 +9930,8 @@ async function enableWebcamForNode(node) {
     }
   } catch (error) {
     Logger.error(`Failed to enable webcam for node ${node.name}:`, error);
+    Logger.error('Error name:', error.name);
+    Logger.error('Error message:', error.message);
     permissions.camera.denied = true;
     updatePermissionUI();
     throw error; // Re-throw so the button handler can show the error
@@ -9958,12 +10014,20 @@ function analyzeCameraData(frameData) {
  * Update camera display in UI
  */
 function updateCameraDisplay() {
-  document.getElementById('camera-brightness').textContent = cameraComponents.brightness.value.toFixed(3);
-  document.getElementById('camera-motion').textContent = cameraComponents.motion.value.toFixed(3);
-  document.getElementById('camera-red').textContent = cameraComponents.redAvg.value.toFixed(3);
-  document.getElementById('camera-green').textContent = cameraComponents.greenAvg.value.toFixed(3);
-  document.getElementById('camera-blue').textContent = cameraComponents.blueAvg.value.toFixed(3);
-  document.getElementById('camera-contrast').textContent = cameraComponents.contrast.value.toFixed(3);
+  // Only update if elements exist (for CameraInput control nodes)
+  const brightnessEl = document.getElementById('camera-brightness');
+  const motionEl = document.getElementById('camera-motion');
+  const redEl = document.getElementById('camera-red');
+  const greenEl = document.getElementById('camera-green');
+  const blueEl = document.getElementById('camera-blue');
+  const contrastEl = document.getElementById('camera-contrast');
+  
+  if (brightnessEl) brightnessEl.textContent = cameraComponents.brightness.value.toFixed(3);
+  if (motionEl) motionEl.textContent = cameraComponents.motion.value.toFixed(3);
+  if (redEl) redEl.textContent = cameraComponents.redAvg.value.toFixed(3);
+  if (greenEl) greenEl.textContent = cameraComponents.greenAvg.value.toFixed(3);
+  if (blueEl) blueEl.textContent = cameraComponents.blueAvg.value.toFixed(3);
+  if (contrastEl) contrastEl.textContent = cameraComponents.contrast.value.toFixed(3);
 }
 
 /**
