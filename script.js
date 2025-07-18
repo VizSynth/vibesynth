@@ -7890,10 +7890,12 @@ function renderNode(node, time) {
     }
     
     
-    if (node.video && node.video.readyState === node.video.HAVE_ENOUGH_DATA && node.texture) {
-      // Validate texture before use
-      if (!gl.isTexture(node.texture)) {
-        Logger.error(`${node.type} node ${node.name} has invalid texture`);
+    if (node.video && node.video.readyState === node.video.HAVE_ENOUGH_DATA) {
+      Logger.debug(`${node.type} node ${node.name} ready to render with video`);
+      
+      // Check if we have a valid texture
+      if (!node.texture || !gl.isTexture(node.texture)) {
+        Logger.error(`${node.type} node ${node.name} has no valid texture`);
         return;
       }
       
@@ -7913,6 +7915,8 @@ function renderNode(node, time) {
         const error = gl.getError();
         if (error !== gl.NO_ERROR) {
           Logger.error(`${node.type} texture upload error:`, error);
+        } else {
+          Logger.trace(`${node.type} texture uploaded successfully`);
         }
       } catch(e) {
         // Handle video texture errors
@@ -7923,8 +7927,14 @@ function renderNode(node, time) {
       if (currentTexture && currentTexture !== node.texture) {
         gl.bindTexture(gl.TEXTURE_2D, currentTexture);
       }
+      
+      // Continue to render the texture to FBO
+      // Don't return early - let it continue to the normal rendering flow
+    } else {
+      // Video not ready yet
+      Logger.trace(`${node.type} video not ready, skipping`);
+      return;
     }
-    // Don't set up shader here - let the normal render flow handle it
   }
   
   
@@ -8117,6 +8127,10 @@ function renderNode(node, time) {
     }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, node.fbo);
+    
+    if (node.type === 'Camera') {
+      Logger.info(`Camera ${node.name} binding to FBO ${node.fbo}`);
+    }
 
     // Check for framebuffer binding errors
     error = gl.getError();
@@ -8154,6 +8168,11 @@ function renderNode(node, time) {
   }
 
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, quadBuffer.numItems);
+  
+  // Log successful render for Camera nodes
+  if (node.type === 'Camera' || node.type === 'VideoFileInput') {
+    Logger.info(`${node.type} node ${node.name} rendered successfully to FBO`);
+  }
 
   // Check for errors after drawing
   error = gl.getError();
