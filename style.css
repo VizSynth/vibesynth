@@ -62,6 +62,11 @@ html, body {
   font-size: 16px;
 }
 
+.logo img {
+  display: block;
+  filter: brightness(1.1);
+}
+
 .logo .material-icons {
   color: var(--accent-primary);
   font-size: 24px;
