@@ -1012,13 +1012,10 @@ window.requestCameraPermission = async function() {
 };
 
 window.enableCameraForNode = async function(nodeId) {
-  Logger.info(`enableCameraForNode called with nodeId: ${nodeId}`);
   const node = nodes.find(n => n.id === nodeId);
-  Logger.info(`Found node:`, node ? {id: node.id, type: node.type, name: node.name} : 'null');
   
   if (node && node.type === 'Camera') {
     try {
-      Logger.info(`Calling enableWebcamForNode for ${node.name}`);
       await enableWebcamForNode(node);
       
       // Update the button on the node
@@ -1032,8 +1029,6 @@ window.enableCameraForNode = async function(nodeId) {
       if (selectedNode === node) {
         showNodeProperties(node);
       }
-      
-      Logger.info(`Camera successfully enabled for node ${node.name}`);
     } catch (error) {
       Logger.error('Failed to enable camera for node:', error);
       // Update button to show error
@@ -1043,8 +1038,6 @@ window.enableCameraForNode = async function(nodeId) {
         btn.style.background = '#ef4444';
       }
     }
-  } else {
-    Logger.error(`Invalid node or not a Camera node: ${nodeId}`);
   }
 };
 
@@ -4674,7 +4667,7 @@ function setupCameraNode(node) {
   setTextureParams();
   gl.bindTexture(gl.TEXTURE_2D, null);
   
-  Logger.info(`Camera ${node.name}: Created separate video texture ${node.videoTexture} and output texture ${node.texture}`);
+  Logger.debug(`Camera ${node.name}: Created separate video texture and output texture`);
   
   // Create video element
   node.video = document.createElement('video');
@@ -7833,11 +7826,9 @@ function renderFinalOutput() {
     return;
   }
   
-  // Special debugging for Camera nodes
+  // Camera nodes now render properly with separate textures
   if (connectedNode.type === 'Camera') {
-    Logger.info(`=== Final output rendering Camera ${connectedNode.name} ===`);
-    Logger.debug(`Camera texture: ${connectedNode.texture}`);
-    Logger.debug(`Texture is valid: ${gl.isTexture(connectedNode.texture)}`);
+    Logger.trace(`Final output rendering Camera ${connectedNode.name}`);
   }
 
   gl.useProgram(programs.copy);
@@ -7872,13 +7863,9 @@ function renderNode(node, time) {
     return;
   }
   
-  // Debug Camera nodes
+  // Debug Camera nodes (only if trace logging enabled)
   if (node.type === 'Camera') {
-    Logger.info(`=== Starting Camera render for ${node.name} ===`);
-    Logger.debug(`Video element: ${!!node.video}`);
-    Logger.debug(`Video ready state: ${node.video?.readyState}`);
-    Logger.debug(`Has texture: ${!!node.texture}`);
-    Logger.debug(`Has program: ${!!node.program}`);
+    Logger.trace(`Starting Camera render for ${node.name}`);
   }
 
   // Skip Camera/VideoFileInput nodes if video isn't ready yet - do this EARLY before any GL state changes
@@ -7934,7 +7921,7 @@ function renderNode(node, time) {
     
     
     if (node.video && node.video.readyState === node.video.HAVE_ENOUGH_DATA) {
-      Logger.info(`${node.type} node ${node.name} ready to render with video`);
+      Logger.trace(`${node.type} node ${node.name} ready to render with video`);
       
       // Check if we have valid textures
       if (!node.videoTexture || !gl.isTexture(node.videoTexture)) {
@@ -8173,21 +8160,9 @@ function renderNode(node, time) {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, node.fbo);
     
+    // Camera FBO binding is now safe with separate textures
     if (node.type === 'Camera') {
-      Logger.info(`Camera ${node.name} binding to FBO ${node.fbo}`);
-      
-      // Check texture attachment
-      const attachment = gl.getFramebufferAttachmentParameter(
-        gl.FRAMEBUFFER, 
-        gl.COLOR_ATTACHMENT0, 
-        gl.FRAMEBUFFER_ATTACHMENT_OBJECT_NAME
-      );
-      Logger.debug(`FBO COLOR_ATTACHMENT0 texture: ${attachment}`);
-      Logger.debug(`Node texture: ${node.texture}`);
-      
-      if (attachment === node.texture) {
-        Logger.warn(`Camera texture is attached to its own FBO - this could cause issues`);
-      }
+      Logger.trace(`Camera ${node.name} binding to FBO`);
     }
 
     // Check for framebuffer binding errors
@@ -8230,13 +8205,9 @@ function renderNode(node, time) {
   
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, quadBuffer.numItems);
   
-  // Log successful render for Camera nodes
+  // Log successful render for Camera nodes (trace level)
   if (node.type === 'Camera' || node.type === 'VideoFileInput') {
-    Logger.info(`${node.type} node ${node.name} rendered successfully to FBO`);
-    
-    // Check texture state
-    const currentTexture = gl.getParameter(gl.TEXTURE_BINDING_2D);
-    Logger.debug(`Current texture binding after draw: ${currentTexture}`);
+    Logger.trace(`${node.type} node ${node.name} rendered successfully to FBO`);
   }
 
   // Check for errors after drawing
@@ -8623,7 +8594,7 @@ function bindNodeInputTextures(node) {
 
   // Special handling for Camera and VideoFileInput nodes - they use their own texture
   if ((node.type === 'Camera' || node.type === 'VideoFileInput')) {
-    Logger.info(`=== ${node.type} Texture Binding Debug ===`);
+    Logger.trace(`${node.type} Texture Binding Debug`);
     
     // Camera nodes use videoTexture for input
     const textureToUse = node.type === 'Camera' ? node.videoTexture : node.texture;
@@ -8668,7 +8639,7 @@ function bindNodeInputTextures(node) {
       Logger.error(`${node.type} could not find u_texture uniform in shader`);
     }
     
-    Logger.info(`=== End ${node.type} Texture Binding ===`);
+    Logger.trace(`End ${node.type} Texture Binding`);
     return; // Camera/VideoFileInput nodes don't have inputs
   }
 
@@ -10005,14 +9976,10 @@ async function enableCameraInput() {
  * Enable webcam for a specific camera node
  */
 async function enableWebcamForNode(node) {
-  Logger.info(`enableWebcamForNode called for node: ${node.name}`);
-  
   if (!node.video) {
     Logger.error('No video element on node:', node.name);
     return;
   }
-  
-  Logger.info('Video element exists, requesting camera access...');
   
   try {
     const constraints = {
@@ -10021,22 +9988,15 @@ async function enableWebcamForNode(node) {
         height: { ideal: 720 }
       }
     };
-    Logger.info('Calling getUserMedia with constraints:', constraints);
     
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    
-    Logger.info('Got media stream:', stream);
-    Logger.info('Stream tracks:', stream.getTracks().map(t => ({kind: t.kind, enabled: t.enabled})));
     
     node.video.srcObject = stream;
     node.stream = stream;
     
-    Logger.info('Set video srcObject, attempting to play...');
-    
     // Wait for video to be ready before playing
     await new Promise((resolve) => {
       node.video.onloadedmetadata = () => {
-        Logger.info('Video metadata loaded');
         resolve();
       };
     });
@@ -10044,10 +10004,8 @@ async function enableWebcamForNode(node) {
     // Ensure video plays
     try {
       await node.video.play();
-      Logger.info('Video playing successfully');
     } catch (playError) {
       if (playError.name === 'AbortError') {
-        Logger.warn('Video play was aborted, retrying...');
         // Retry once after a small delay
         await new Promise(resolve => setTimeout(resolve, 100));
         await node.video.play();
@@ -10064,7 +10022,7 @@ async function enableWebcamForNode(node) {
     permissions.camera.requested = true;
     updatePermissionUI();
     
-    Logger.info(`Webcam enabled for node: ${node.name}`);
+    Logger.debug(`Webcam enabled for node: ${node.name}`);
     
     // Force a re-render to show the video
     if (selectedNode === node) {
@@ -10072,8 +10030,6 @@ async function enableWebcamForNode(node) {
     }
   } catch (error) {
     Logger.error(`Failed to enable webcam for node ${node.name}:`, error);
-    Logger.error('Error name:', error.name);
-    Logger.error('Error message:', error.message);
     permissions.camera.denied = true;
     updatePermissionUI();
     throw error; // Re-throw so the button handler can show the error
