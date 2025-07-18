@@ -64,7 +64,9 @@ html, body {
 
 .logo img {
   display: block;
-  filter: brightness(1.1);
+  height: 32px;
+  width: auto;
+  object-fit: contain;
 }
 
 .logo .material-icons {
