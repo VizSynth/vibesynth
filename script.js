@@ -7923,10 +7923,8 @@ function renderNode(node, time) {
         Logger.error(`${node.type} texture update error:`, e);
       }
       
-      // Restore previous texture binding to avoid state conflicts
-      if (currentTexture && currentTexture !== node.texture) {
-        gl.bindTexture(gl.TEXTURE_2D, currentTexture);
-      }
+      // CRITICAL: Unbind the texture to prevent feedback loop
+      gl.bindTexture(gl.TEXTURE_2D, null);
       
       // Continue to render the texture to FBO
       // Don't return early - let it continue to the normal rendering flow
@@ -9946,10 +9944,28 @@ async function enableWebcamForNode(node) {
     
     Logger.info('Set video srcObject, attempting to play...');
     
-    // Ensure video plays
-    await node.video.play();
+    // Wait for video to be ready before playing
+    await new Promise((resolve) => {
+      node.video.onloadedmetadata = () => {
+        Logger.info('Video metadata loaded');
+        resolve();
+      };
+    });
     
-    Logger.info('Video playing successfully');
+    // Ensure video plays
+    try {
+      await node.video.play();
+      Logger.info('Video playing successfully');
+    } catch (playError) {
+      if (playError.name === 'AbortError') {
+        Logger.warn('Video play was aborted, retrying...');
+        // Retry once after a small delay
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await node.video.play();
+      } else {
+        throw playError;
+      }
+    }
     
     // Mark video as ready
     node.videoReady = true;
