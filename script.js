@@ -2491,11 +2491,47 @@ function compileShaders() {
   // VideoFileInput shader - uses text shader (simple texture pass-through)
   programs.videofileinput = programs.text;
   
-  // Camera shader - uses text shader (simple texture pass-through)
-  programs.camera = programs.text;
+  // Camera shader - flips Y coordinate to correct orientation and maintains aspect ratio
+  const fragCamera = `
+    precision mediump float;
+    uniform sampler2D u_texture;
+    uniform vec2 u_resolution;
+    uniform vec2 u_videoSize;
+    varying vec2 v_uv;
+    
+    void main() {
+      vec2 uv = v_uv;
+      
+      // Calculate aspect ratios
+      float canvasAspect = u_resolution.x / u_resolution.y;
+      float videoAspect = u_videoSize.x / u_videoSize.y;
+      
+      // Adjust UV coordinates to maintain aspect ratio (fit mode)
+      if (videoAspect > canvasAspect) {
+        // Video is wider - add letterboxing top/bottom
+        float scale = canvasAspect / videoAspect;
+        uv.y = (uv.y - 0.5) * scale + 0.5;
+      } else {
+        // Video is taller - add letterboxing left/right
+        float scale = videoAspect / canvasAspect;
+        uv.x = (uv.x - 0.5) * scale + 0.5;
+      }
+      
+      // Flip Y coordinate to correct video orientation
+      vec2 flippedUV = vec2(uv.x, 1.0 - uv.y);
+      
+      // Sample with black outside bounds
+      if (flippedUV.x < 0.0 || flippedUV.x > 1.0 || flippedUV.y < 0.0 || flippedUV.y > 1.0) {
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+      } else {
+        gl_FragColor = texture2D(u_texture, flippedUV);
+      }
+    }
+  `;
+  programs.camera = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragCamera));
   
   if (!programs.camera) {
-    Logger.error('Failed to assign Camera shader program');
+    Logger.error('Failed to create Camera shader program');
   }
   
   // CameraInput shader - for control input nodes
@@ -8558,6 +8594,14 @@ function setNodeUniforms(node) {
     }
   }
 
+  // Special handling for Camera node
+  if (node.type === 'Camera' && node.video && node.video.videoWidth > 0) {
+    const videoSizeLoc = gl.getUniformLocation(program, 'u_videoSize');
+    if (videoSizeLoc) {
+      gl.uniform2f(videoSizeLoc, node.video.videoWidth, node.video.videoHeight);
+    }
+  }
+  
   // Special handling for input nodes
   if (node.category === 'input') {
     const valueLoc = gl.getUniformLocation(program, 'u_value');
