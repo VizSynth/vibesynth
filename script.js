@@ -4653,12 +4653,28 @@ function setTextureParams() {
 }
 
 function setupCameraNode(node) {
-  // Allocate FBO like other nodes
+  // Allocate FBO like other nodes - this creates node.texture for output
   const fboResult = allocateNodeFBO(node);
   if (!fboResult) {
     Logger.error(`Failed to allocate FBO for Camera node ${node.name}`);
     return false;
   }
+  
+  // Create a SEPARATE texture for video upload
+  node.videoTexture = gl.createTexture();
+  if (!node.videoTexture) {
+    Logger.error(`Failed to create video texture for Camera node ${node.name}`);
+    return false;
+  }
+  
+  // Initialize video texture with dummy data
+  gl.bindTexture(gl.TEXTURE_2D, node.videoTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, 
+                new Uint8Array([0, 0, 0, 255])); // Black pixel
+  setTextureParams();
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  
+  Logger.info(`Camera ${node.name}: Created separate video texture ${node.videoTexture} and output texture ${node.texture}`);
   
   // Create video element
   node.video = document.createElement('video');
@@ -7920,17 +7936,21 @@ function renderNode(node, time) {
     if (node.video && node.video.readyState === node.video.HAVE_ENOUGH_DATA) {
       Logger.info(`${node.type} node ${node.name} ready to render with video`);
       
-      // Check if we have a valid texture
+      // Check if we have valid textures
+      if (!node.videoTexture || !gl.isTexture(node.videoTexture)) {
+        Logger.error(`${node.type} node ${node.name} has no valid video texture`);
+        return;
+      }
       if (!node.texture || !gl.isTexture(node.texture)) {
-        Logger.error(`${node.type} node ${node.name} has no valid texture`);
+        Logger.error(`${node.type} node ${node.name} has no valid output texture`);
         return;
       }
       
       // Save current texture binding
       const currentTexture = gl.getParameter(gl.TEXTURE_BINDING_2D);
       
-      // Update the node's texture with the current video frame
-      gl.bindTexture(gl.TEXTURE_2D, node.texture);
+      // Update the node's VIDEO texture with the current video frame
+      gl.bindTexture(gl.TEXTURE_2D, node.videoTexture);
       try {
         // Clear any pending errors
         gl.getError();
@@ -7941,13 +7961,13 @@ function renderNode(node, time) {
         // Check for errors
         const error = gl.getError();
         if (error !== gl.NO_ERROR) {
-          Logger.error(`${node.type} texture upload error:`, error);
+          Logger.error(`${node.type} video texture upload error:`, error);
         } else {
-          Logger.trace(`${node.type} texture uploaded successfully`);
+          Logger.trace(`${node.type} video texture uploaded successfully to videoTexture`);
         }
       } catch(e) {
         // Handle video texture errors
-        Logger.error(`${node.type} texture update error:`, e);
+        Logger.error(`${node.type} video texture update error:`, e);
       }
       
       // CRITICAL: Unbind the texture to prevent feedback loop
@@ -8605,7 +8625,10 @@ function bindNodeInputTextures(node) {
   if ((node.type === 'Camera' || node.type === 'VideoFileInput')) {
     Logger.info(`=== ${node.type} Texture Binding Debug ===`);
     
-    if (!node.texture || !gl.isTexture(node.texture)) {
+    // Camera nodes use videoTexture for input
+    const textureToUse = node.type === 'Camera' ? node.videoTexture : node.texture;
+    
+    if (!textureToUse || !gl.isTexture(textureToUse)) {
       Logger.error(`${node.type} has invalid or missing texture`);
       return;
     }
@@ -8618,9 +8641,9 @@ function bindNodeInputTextures(node) {
       Logger.error(`Program mismatch! Current: ${currentProgram}, Expected: ${node.program}`);
     }
     
-    Logger.debug(`${node.type} binding its own texture`);
+    Logger.debug(`${node.type} binding its ${node.type === 'Camera' ? 'video' : 'own'} texture`);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, node.texture);
+    gl.bindTexture(gl.TEXTURE_2D, textureToUse);
     
     // Check for texture binding errors
     let error = gl.getError();
