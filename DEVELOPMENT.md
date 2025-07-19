@@ -1,5 +1,15 @@
 # Visual Synthesizer Development Log
 
+## 2025-07-19 16:42 – Fixed FeedbackTrail accumulation
+**Changes**:
+- Fixed texture copy logic to use copyTexSubImage2D after render
+- Removed incorrect swap logic that prevented accumulation
+- Maintained existing shader with max() blend and blur
+- Kept new CSS icon work (history icon)
+- Existing regression test validates the fix
+
+**Key fix**: Previous swap logic was incorrect - now properly copies current frame to feedback texture after each render.
+
 ## 2025-07-19 15:19 – Restored FeedbackTrail per #bug-347
 **Changes**:
 - Reverted to checkpoint's texture swap logic (was using copy)
