@@ -2685,9 +2685,7 @@ function compileShaders() {
       
       feedback *= u_decay;
       
-      // Blend current frame with decayed feedback
-      // Use screen blend mode for better trail visibility
-      gl_FragColor = current + feedback - (current * feedback);
+      gl_FragColor = max(current, feedback);
     }
   `;
   programs.feedbacktrail = createProgram(vertShader, compileShader(gl.FRAGMENT_SHADER, fragFeedbackTrail));
@@ -8319,23 +8317,13 @@ function renderNode(node, time) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
     
-    // Copy current output to feedback texture for next frame
-    // This preserves the trail effect without swapping textures
-    gl.useProgram(programs.copy);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, node.feedbackFbo);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, node.texture);
-    const texLoc = gl.getUniformLocation(programs.copy, 'u_texture');
-    if (texLoc) {
-      gl.uniform1i(texLoc, 0);
-    }
-    
-    bindQuad();
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    // Swap buffers: current output becomes next frame's feedback
+    const tempTex = node.feedbackTexture;
+    const tempFbo = node.feedbackFbo;
+    node.feedbackTexture = node.texture;
+    node.feedbackFbo = node.fbo;
+    node.texture = tempTex;
+    node.fbo = tempFbo;
   }
 }
 

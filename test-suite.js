@@ -803,6 +803,53 @@ testRunner.addTest('canvasDisplay_positioning', async () => {
   deleteNode(testNode2);
 });
 
+testRunner.addTest('feedbackTrail_accumulation', async () => {
+  // Regression test for FeedbackTrail effect
+  const osc = createNode('Oscillator', 100, 100);
+  const trail = createNode('FeedbackTrail', 300, 100);
+  const finalOut = nodes.find(n => n.type === 'FinalOutput');
+  
+  // Connect them
+  trail.inputs[0] = osc;
+  finalOut.inputs[0] = trail;
+  
+  // Set parameters for visible effect
+  trail.params.decay = 0.8;
+  trail.params.blur = 2.0;
+  osc.params.frequency = 5.0;
+  
+  // Render multiple frames to accumulate trail
+  let frameCount = 0;
+  const renderFrames = () => {
+    return new Promise(resolve => {
+      const renderLoop = () => {
+        renderNode(osc, frameCount * 0.1);
+        renderNode(trail, frameCount * 0.1);
+        frameCount++;
+        
+        if (frameCount < 10) {
+          requestAnimationFrame(renderLoop);
+        } else {
+          resolve();
+        }
+      };
+      renderLoop();
+    });
+  };
+  
+  await renderFrames();
+  
+  // Verify trail has valid output texture
+  assert(trail.texture && gl.isTexture(trail.texture), 'FeedbackTrail should have valid output texture');
+  assert(trail.feedbackTexture && gl.isTexture(trail.feedbackTexture), 'FeedbackTrail should have valid feedback texture');
+  
+  // Cleanup
+  trail.inputs[0] = null;
+  finalOut.inputs[0] = null;
+  deleteNode(osc);
+  deleteNode(trail);
+});
+
 // Global functions for easy access
 window.runAllTests = () => testRunner.runAllTests();
 window.runTest = (name) => testRunner.runTest(name);

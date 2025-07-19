@@ -1,5 +1,14 @@
 # Visual Synthesizer Development Log
 
+## 2025-07-19 15:19 – Restored FeedbackTrail per #bug-347
+**Changes**:
+- Reverted to checkpoint's texture swap logic (was using copy)
+- Maintained max() blend mode in shader as per working version
+- Kept new CSS icon work (history icon)
+- Added regression test for trail accumulation
+
+**Key fix**: The issue was using texture copy instead of texture swap, which prevented the feedback loop from working correctly.
+
 ## 2025-07-14 - Development Process Established
 **Time**: 07:28 PST
 **Changes**:
