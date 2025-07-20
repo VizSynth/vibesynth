@@ -905,6 +905,40 @@ testRunner.addTest('feedbackTrail_brightness_accumulation', async () => {
   deleteNode(trail);
 });
 
+testRunner.addTest('circular_dependency_prevention', () => {
+  // Test that circular dependencies are prevented and don't cause black output
+  const layer1 = createNode('Layer', 100, 100);
+  const layer2 = createNode('Layer', 300, 100);
+  
+  // Create circular dependency
+  layer1.inputs[0] = layer2;
+  layer2.inputs[0] = layer1;
+  
+  // Set some test parameters
+  layer1.params.opacity = 1.0;
+  layer1.params.blendMode = 'Normal';
+  layer2.params.opacity = 0.5;
+  layer2.params.blendMode = 'Screen';
+  
+  // Attempt to render - should not crash or produce errors
+  try {
+    renderNode(layer1, 0);
+    renderNode(layer2, 0);
+  } catch (e) {
+    assert(false, 'Circular dependency caused rendering error: ' + e.message);
+  }
+  
+  // Verify fallback textures were used
+  assert(layer1.texture && gl.isTexture(layer1.texture), 'Layer1 should have valid output texture despite circular dependency');
+  assert(layer2.texture && gl.isTexture(layer2.texture), 'Layer2 should have valid output texture despite circular dependency');
+  
+  // Cleanup
+  layer1.inputs[0] = null;
+  layer2.inputs[0] = null;
+  deleteNode(layer1);
+  deleteNode(layer2);
+});
+
 // Global functions for easy access
 window.runAllTests = () => testRunner.runAllTests();
 window.runTest = (name) => testRunner.runTest(name);

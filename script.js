@@ -8718,12 +8718,34 @@ function bindNodeInputTextures(node) {
       // PREVENT FEEDBACK LOOP: Enhanced detection for Mix/Layer nodes
       if (inputNode === node) {
         Logger.warn(`Preventing direct feedback loop: ${node.name} cannot use itself as input`);
+        // Use fallback texture instead of skipping
+        const fallback = createFallbackTexture();
+        if (fallback) {
+          gl.activeTexture(gl.TEXTURE0 + index);
+          gl.bindTexture(gl.TEXTURE_2D, fallback);
+          textureBindings.push({
+            unit: gl.TEXTURE0 + index,
+            texture: fallback,
+            index: index
+          });
+        }
         return;
       }
 
       // PREVENT INDIRECT FEEDBACK LOOP: Check if inputNode depends on current node
       if (nodeHasDependency(inputNode, node)) {
         Logger.warn(`Preventing indirect feedback loop: ${node.name} -> ${inputNode.name} -> ... -> ${node.name}`);
+        // Use fallback texture instead of skipping
+        const fallback = createFallbackTexture();
+        if (fallback) {
+          gl.activeTexture(gl.TEXTURE0 + index);
+          gl.bindTexture(gl.TEXTURE_2D, fallback);
+          textureBindings.push({
+            unit: gl.TEXTURE0 + index,
+            texture: fallback,
+            index: index
+          });
+        }
         return;
       }
 
@@ -8754,6 +8776,30 @@ function bindNodeInputTextures(node) {
       });
     }
   });
+
+  // For multi-input nodes, ensure all expected texture slots are filled
+  const isMultiInputNode = node.type === 'Mix' || node.type === 'Layer' || node.type === 'Composite';
+  if (isMultiInputNode) {
+    const expectedInputs = node.type === 'Composite' ? 4 : 2;
+    
+    // Fill any missing texture slots with fallback textures
+    for (let i = 0; i < expectedInputs; i++) {
+      const hasBinding = textureBindings.some(b => b.index === i);
+      if (!hasBinding) {
+        const fallback = createFallbackTexture();
+        if (fallback) {
+          gl.activeTexture(gl.TEXTURE0 + i);
+          gl.bindTexture(gl.TEXTURE_2D, fallback);
+          textureBindings.push({
+            index: i,
+            textureUnit: i,
+            texture: fallback
+          });
+          Logger.debug(`Bound fallback texture to unit ${i} for missing input`);
+        }
+      }
+    }
+  }
 
   // Second pass: Set all uniforms AFTER all textures are bound
   textureBindings.forEach(binding => {

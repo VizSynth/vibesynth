@@ -1,5 +1,12 @@
 # Visual Synthesizer Development Log
 
+## 2025-07-19 17:45 – Fixed circular dependency handling in Layer nodes
+**Changes**:
+- Added fallback texture binding for circular dependencies
+- Ensured all texture slots are filled for multi-input nodes
+- Prevents black output when circular references are detected
+- Added test for circular dependency prevention
+
 ## 2025-07-19 17:05 – Re-reverted to swap (copy caused blank trails)
 **Changes**:
 - Restored swap logic & max() blend
