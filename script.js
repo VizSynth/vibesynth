@@ -5025,36 +5025,39 @@ function createNodeElement(node) {
         gap: 4px;
       }
       
+      /* === Ports & labels ========================================= */
       .node-port {
         display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 3px 6px;
-        position: relative;
+        gap: 4px;            /* <<  tighten label-to-circle distance */
+        padding: 2px 6px;
+        font-size: 12px;
+        font-weight: 600;
       }
       
       .port {
-        width: 12px;
-        height: 12px;
+        width: 14px;          /* larger hit area                     */
+        height: 14px;
         background: #555;
         border: 2px solid #333;
         border-radius: 50%;
         cursor: pointer;
         transition: all 0.2s ease;
+        flex-shrink: 0;
       }
       
+      /* Nice micro-interaction */
       .port:hover {
         background: #888;
-        border-color: #555;
+        box-shadow: 0 0 6px rgba(99,102,241,.4);
       }
       
-      .port.input {
-        margin-right: auto;
-      }
+      /* Keep inputs left, outputs right via flex order instead of margins */
+      .port.input  { order: 0; }
+      .port.output { order: 1; }
       
-      .port.output {
-        margin-left: auto;
-      }
+      /* Label text gets the opposite order so it sits beside the circle */
+      .node-port span { order: 2; }
       
       .port.connected {
         background: #3b82f6;

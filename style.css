@@ -617,28 +617,30 @@ html, body {
 }
 
 .node-body {
-  padding: 10px 12px;
+  padding: 10px 8px;
 }
 
 /* Node Ports */
 .node-ports {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .node-port {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   font-size: 11px;
   color: var(--text-secondary);
+  padding: 2px 0;
+  font-weight: 500;
 }
 
 .port {
-  width: 10px;
-  height: 10px;
-  border: 1px solid var(--border-color);
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border-color);
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -656,13 +658,15 @@ html, body {
 }
 
 .port:hover {
-  transform: scale(1.2);
+  transform: scale(1.15);
   border-color: var(--accent-primary);
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.4);
 }
 
 .port.connected {
   background: var(--accent-primary);
   border-color: var(--accent-primary);
+  box-shadow: 0 0 4px rgba(59, 130, 246, 0.6);
 }
 
 /* Connections */
@@ -1224,12 +1228,13 @@ html, body {
 }
 
 .control-label {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-secondary);
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
-  max-width: 60px;
+  max-width: 70px;
+  font-weight: 500;
 }
 
 .port.control-input {
