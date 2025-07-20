@@ -18,6 +18,7 @@ runTest('testName')     # Run specific test
 createTestScenario()    # Create test nodes for manual testing
 
 # Create checkpoint (when user requests)
+bash backup.sh              # Create timestamped backup
 git add -A
 git commit -m "type: summary"  # types: feat, fix, refactor, test, docs, style, perf, chore
 ```
@@ -53,7 +54,10 @@ Before any feature is complete:
 4. Test edge cases and performance
 
 ### Checkpoint Protocol
-Create git checkpoint when user mentions: `[Checkpoint]`, `checkpoint`, `save progress`, `commit this`
+When user mentions: `[Checkpoint]`, `checkpoint`, `save progress`, `commit this`:
+1. Run `bash backup.sh` to create timestamped backup
+2. Stage all changes with `git add -A`
+3. Create descriptive commit with proper format
 
 ### Code Style
 - Follow existing patterns in codebase
