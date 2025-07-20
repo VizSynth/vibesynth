@@ -905,6 +905,60 @@ testRunner.addTest('feedbackTrail_brightness_accumulation', async () => {
   deleteNode(trail);
 });
 
+testRunner.addTest('feedbackTrail_with_layer_graph', async () => {
+  // Regression test for exact graph: Oscillator → FeedbackTrail → Layer(+Voronoi) → Canvas
+  const osc = createNode('Oscillator', 100, 100);
+  const trail = createNode('FeedbackTrail', 300, 100);
+  const voronoi = createNode('Voronoi', 100, 300);
+  const layer = createNode('Layer', 500, 200);
+  
+  // Connect the graph
+  trail.inputs[0] = osc;
+  layer.inputs[0] = trail;
+  layer.inputs[1] = voronoi;
+  
+  // Set parameters
+  osc.params.frequency = 5.0;
+  trail.params.decay = 0.9;
+  trail.params.blur = 1.0;
+  layer.params.opacity = 1.0;
+  layer.params.blendMode = 'Normal';
+  
+  // Render three frames
+  for (let frame = 0; frame < 3; frame++) {
+    const time = frame * 0.1;
+    renderNode(osc, time);
+    renderNode(voronoi, time);
+    renderNode(trail, time);
+    renderNode(layer, time);
+  }
+  
+  // Read pixels from layer output
+  const pixels = new Uint8Array(canvas.width * canvas.height * 4);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, layer.fbo);
+  gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  
+  // Calculate average green channel (should be > 0.02 if trail is accumulating)
+  let totalGreen = 0;
+  for (let i = 1; i < pixels.length; i += 4) {
+    totalGreen += pixels[i] / 255.0;
+  }
+  const avgGreen = totalGreen / (canvas.width * canvas.height);
+  
+  assert(avgGreen > 0.02, 
+    `FeedbackTrail should accumulate in Layer output (avg green: ${avgGreen.toFixed(4)})`);
+  
+  // Cleanup
+  trail.inputs[0] = null;
+  layer.inputs[0] = null;
+  layer.inputs[1] = null;
+  deleteNode(osc);
+  deleteNode(trail);
+  deleteNode(voronoi);
+  deleteNode(layer);
+});
+
 testRunner.addTest('circular_dependency_prevention', () => {
   // Test that circular dependencies are prevented and don't cause black output
   const layer1 = createNode('Layer', 100, 100);

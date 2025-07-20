@@ -8356,14 +8356,28 @@ function renderNode(node, time) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
     
-    // --- FeedbackTrail buffer swap (reinstated) ---
-    const tempTex = node.feedbackTexture;
-    const tempFbo = node.feedbackFbo;
-    node.feedbackTexture = node.texture;
-    node.feedbackFbo = node.fbo;
-    node.texture = tempTex;
-    node.fbo = tempFbo;
-    // ------------------------------------------------
+    // After rendering, copy current output → feedbackTexture so the shader
+    // sees the *previous* frame next tick but downstream nodes see the *current* frame.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, node.feedbackFbo);
+    
+    // Use copy program to copy current texture to feedback texture
+    gl.useProgram(programs.copy);
+    
+    // Bind the current node texture to texture unit 0
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, node.texture);
+    
+    // Set the texture uniform
+    const texLoc = gl.getUniformLocation(programs.copy, 'u_texture');
+    if (texLoc) {
+      gl.uniform1i(texLoc, 0);
+    }
+    
+    // Draw fullscreen quad to copy the texture
+    bindQuad();
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 }
 
@@ -8690,6 +8704,7 @@ function setNodeUniforms(node) {
 
 /**
  * Bind input textures for a node
+ * *** SINGLE SOURCE OF TRUTH ***
  */
 function bindNodeInputTextures(node) {
   // CRITICAL FIX: For multi-texture nodes, bind ALL textures FIRST, then set uniforms
@@ -8843,7 +8858,7 @@ function bindNodeInputTextures(node) {
   // Second pass: Set all uniforms AFTER all textures are bound
   textureBindings.forEach(binding => {
     const isMultiInputNode = node.type === 'Mix' || node.type === 'Layer' || node.type === 'Composite';
-    const uniformName = isMultiInputNode ? `u_texture${binding.index + 1}` : (binding.index === 0 ? "u_texture" : `u_texture${binding.index + 1}`);
+    const uniformName = isMultiInputNode ? `u_texture${binding.index + 1}` : "u_texture";
 
     const loc = gl.getUniformLocation(node.program, uniformName);
     if (loc !== null && loc !== -1) {
