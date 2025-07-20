@@ -8858,7 +8858,12 @@ function bindNodeInputTextures(node) {
   // Second pass: Set all uniforms AFTER all textures are bound
   textureBindings.forEach(binding => {
     const isMultiInputNode = node.type === 'Mix' || node.type === 'Layer' || node.type === 'Composite';
-    const uniformName = isMultiInputNode ? `u_texture${binding.index + 1}` : "u_texture";
+    
+    const uniformName = isMultiInputNode
+      ? `u_texture${binding.index + 1}`          // u_texture1,2,3...
+      : (binding.index === 0
+           ? 'u_texture'                         // first (and often only) inlet
+           : `u_texture${binding.index + 1}`);   // future extra ports
 
     const loc = gl.getUniformLocation(node.program, uniformName);
     if (loc !== null && loc !== -1) {
