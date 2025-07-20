@@ -8342,42 +8342,39 @@ function renderNode(node, time) {
   // >>> SINGLE SOURCE OF TRUTH – do not duplicate! <<<
   // Special post-processing for FeedbackTrail
   if (node.type === 'FeedbackTrail') {
-    // Ensure feedback buffer exists
+    // 1. Allocate feedback FBO/texture once
     if (!node.feedbackTexture) {
-      // Create feedback texture
       node.feedbackTexture = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, node.feedbackTexture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA,
+                    canvas.width, canvas.height, 0,
+                    gl.RGBA, gl.UNSIGNED_BYTE, null);
       setTextureParams();
-      
-      // Create feedback framebuffer
+
       node.feedbackFbo = gl.createFramebuffer();
       gl.bindFramebuffer(gl.FRAMEBUFFER, node.feedbackFbo);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, node.feedbackTexture, 0);
+      gl.framebufferTexture2D(
+        gl.FRAMEBUFFER,
+        gl.COLOR_ATTACHMENT0,
+        gl.TEXTURE_2D,
+        node.feedbackTexture,
+        0
+      );
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
-    
-    // After rendering, copy current output → feedbackTexture so the shader
-    // sees the *previous* frame next tick but downstream nodes see the *current* frame.
+
+    // 2. COPY current render → feedbackTexture (no swapping!)
     gl.bindFramebuffer(gl.FRAMEBUFFER, node.feedbackFbo);
-    
-    // Use copy program to copy current texture to feedback texture
     gl.useProgram(programs.copy);
-    
-    // Bind the current node texture to texture unit 0
+
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, node.texture);
-    
-    // Set the texture uniform
-    const texLoc = gl.getUniformLocation(programs.copy, 'u_texture');
-    if (texLoc) {
-      gl.uniform1i(texLoc, 0);
-    }
-    
-    // Draw fullscreen quad to copy the texture
+    const uTex = gl.getUniformLocation(programs.copy, 'u_texture');
+    if (uTex) gl.uniform1i(uTex, 0);
+
     bindQuad();
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 }
@@ -8617,22 +8614,6 @@ function setNodeUniforms(node) {
     }
   }
   
-  if (node.type === 'FeedbackTrail') {
-    // Feedback trail needs special texture handling in render loop
-    if (!node.feedbackTexture) {
-      // Create feedback texture
-      node.feedbackTexture = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, node.feedbackTexture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-      setTextureParams();
-      
-      // Create feedback framebuffer
-      node.feedbackFbo = gl.createFramebuffer();
-      gl.bindFramebuffer(gl.FRAMEBUFFER, node.feedbackFbo);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, node.feedbackTexture, 0);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    }
-  }
 
   // Special handling for Transform node vec2 uniforms
   if (node.type === 'Transform') {
