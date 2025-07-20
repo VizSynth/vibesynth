@@ -1379,7 +1379,7 @@ class SynthNode {
       },
       AudioInput: {
         inputs: [],
-        params: { band: 'overall', min: 0.0, max: 1.0 },
+        params: { band: 'overall', min: 0.0, max: 1.0, reverseRange: false },
         icon: 'graphic_eq',
         category: 'input'
       },
@@ -6387,6 +6387,8 @@ function showNodeProperties(node) {
     let labelText = key;
     if (key === 'interval' && node.type === 'RandomInput') {
       labelText = 'interval (seconds)';
+    } else if (key === 'reverseRange' && node.type === 'AudioInput') {
+      labelText = 'Reverse Range';
     }
 
     const inputId = `param-${node.id}-${key}`;
@@ -7575,7 +7577,16 @@ function updateInputNodeValue(node, time) {
         // Map to configured min/max range
         const audioMin = node.params.min || 0;
         const audioMax = node.params.max || 1;
-        value = audioMin + (rawValue * (audioMax - audioMin));
+        
+        // Apply reverse range if enabled
+        const reverseRange = node.params.reverseRange || false;
+        if (reverseRange) {
+          // When reverse is on, high audio = low output, low audio = high output
+          value = audioMax - (rawValue * (audioMax - audioMin));
+        } else {
+          // Normal operation: low audio = low output, high audio = high output
+          value = audioMin + (rawValue * (audioMax - audioMin));
+        }
         
         // Debug logging
         if (selectedNode === node) {
@@ -7583,6 +7594,7 @@ function updateInputNodeValue(node, time) {
             - Band: ${band}
             - Raw audio level: ${rawValue}
             - Min/Max: ${audioMin}/${audioMax}
+            - Reverse Range: ${reverseRange}
             - Output value: ${value}`);
         }
       }
