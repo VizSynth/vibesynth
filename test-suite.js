@@ -850,6 +850,61 @@ testRunner.addTest('feedbackTrail_accumulation', async () => {
   deleteNode(trail);
 });
 
+testRunner.addTest('feedbackTrail_brightness_accumulation', async () => {
+  // Regression test ensuring FeedbackTrail accumulates brightness over frames
+  const osc = createNode('Oscillator', 100, 100);
+  const trail = createNode('FeedbackTrail', 300, 100);
+  
+  // Connect them
+  trail.inputs[0] = osc;
+  
+  // Set parameters for accumulation test
+  trail.params.decay = 0.9;
+  trail.params.blur = 0.0;  // No blur for clearer brightness test
+  osc.params.frequency = 2.0;
+  
+  // Capture initial brightness after first frame
+  renderNode(osc, 0);
+  renderNode(trail, 0);
+  
+  // Read pixels to calculate initial brightness
+  const initialPixels = new Uint8Array(canvas.width * canvas.height * 4);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, trail.fbo);
+  gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, initialPixels);
+  
+  let initialBrightness = 0;
+  for (let i = 0; i < initialPixels.length; i += 4) {
+    initialBrightness += (initialPixels[i] + initialPixels[i+1] + initialPixels[i+2]) / 3;
+  }
+  
+  // Render 3 more frames
+  for (let t = 1; t <= 3; t++) {
+    renderNode(osc, t * 0.1);
+    renderNode(trail, t * 0.1);
+  }
+  
+  // Read pixels after accumulation
+  const accumulatedPixels = new Uint8Array(canvas.width * canvas.height * 4);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, trail.fbo);
+  gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, accumulatedPixels);
+  
+  let accumulatedBrightness = 0;
+  for (let i = 0; i < accumulatedPixels.length; i += 4) {
+    accumulatedBrightness += (accumulatedPixels[i] + accumulatedPixels[i+1] + accumulatedPixels[i+2]) / 3;
+  }
+  
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  
+  // Verify brightness increased
+  assert(accumulatedBrightness > initialBrightness, 
+    'FeedbackTrail should accumulate brightness over multiple frames');
+  
+  // Cleanup
+  trail.inputs[0] = null;
+  deleteNode(osc);
+  deleteNode(trail);
+});
+
 // Global functions for easy access
 window.runAllTests = () => testRunner.runAllTests();
 window.runTest = (name) => testRunner.runTest(name);

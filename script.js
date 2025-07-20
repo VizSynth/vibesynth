@@ -8317,11 +8317,14 @@ function renderNode(node, time) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
     
-    // Copy current output to feedback texture for next frame
-    gl.bindFramebuffer(gl.FRAMEBUFFER, node.fbo);
-    gl.bindTexture(gl.TEXTURE_2D, node.feedbackTexture);
-    gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, canvas.width, canvas.height);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    // --- FeedbackTrail buffer swap (reinstated) ---
+    const tempTex = node.feedbackTexture;
+    const tempFbo = node.feedbackFbo;
+    node.feedbackTexture = node.texture;
+    node.feedbackFbo = node.fbo;
+    node.texture = tempTex;
+    node.fbo = tempFbo;
+    // ------------------------------------------------
   }
 }
 

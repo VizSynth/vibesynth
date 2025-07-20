@@ -1,5 +1,10 @@
 # Visual Synthesizer Development Log
 
+## 2025-07-19 17:05 – Re-reverted to swap (copy caused blank trails)
+**Changes**:
+- Restored swap logic & max() blend
+- Added regression test 'accumulates brightness over 3 frames'
+
 ## 2025-07-19 16:42 – Fixed FeedbackTrail accumulation
 **Changes**:
 - Fixed texture copy logic to use copyTexSubImage2D after render
