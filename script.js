@@ -8339,6 +8339,7 @@ function renderNode(node, time) {
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   
+  // >>> SINGLE SOURCE OF TRUTH – do not duplicate! <<<
   // Special post-processing for FeedbackTrail
   if (node.type === 'FeedbackTrail') {
     // Ensure feedback buffer exists
