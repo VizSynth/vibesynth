@@ -2502,8 +2502,31 @@ function compileShaders() {
     Logger.error('Failed to create Text shader program');
   }
 
-  // VideoFileInput shader - uses text shader (simple texture pass-through)
-  programs.videofileinput = programs.text;
+  // VideoFileInput shader - flips Y coordinate to correct video orientation
+  const fragVideoFileInput = `
+    precision mediump float;
+    uniform sampler2D u_texture;
+    varying vec2 v_uv;
+    
+    void main() {
+      // Flip Y coordinate to correct video orientation
+      vec2 flippedUV = vec2(v_uv.x, 1.0 - v_uv.y);
+      gl_FragColor = texture2D(u_texture, flippedUV);
+    }
+  `;
+  
+  const videoFileInputFragShader = compileShader(gl.FRAGMENT_SHADER, fragVideoFileInput);
+  if (videoFileInputFragShader) {
+    programs.videofileinput = createProgram(vertShader, videoFileInputFragShader);
+    if (!programs.videofileinput) {
+      Logger.error('Failed to create VideoFileInput shader program');
+      // Fallback to text shader if custom shader fails
+      programs.videofileinput = programs.text;
+    }
+  } else {
+    Logger.error('Failed to compile VideoFileInput fragment shader, using text shader as fallback');
+    programs.videofileinput = programs.text;
+  }
   
   // Camera shader - flips Y coordinate to correct orientation and maintains aspect ratio
   const fragCamera = `
@@ -4745,6 +4768,22 @@ function setupCameraNode(node) {
 function setupVideoFileNode(node) {
   // Allocate FBO like other nodes
   allocateNodeFBO(node);
+  
+  // Create a SEPARATE texture for video upload (like Camera node)
+  node.videoTexture = gl.createTexture();
+  if (!node.videoTexture) {
+    Logger.error(`Failed to create video texture for VideoFileInput node ${node.name}`);
+    return false;
+  }
+  
+  // Initialize video texture with dummy data
+  gl.bindTexture(gl.TEXTURE_2D, node.videoTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, 
+                new Uint8Array([0, 0, 0, 255])); // Black pixel
+  setTextureParams();
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  
+  Logger.debug(`VideoFileInput ${node.name}: Created separate video texture and output texture`);
   
   // Create video element
   node.video = document.createElement('video');
@@ -8664,8 +8703,8 @@ function bindNodeInputTextures(node) {
   if ((node.type === 'Camera' || node.type === 'VideoFileInput')) {
     Logger.trace(`${node.type} Texture Binding Debug`);
     
-    // Camera nodes use videoTexture for input
-    const textureToUse = node.type === 'Camera' ? node.videoTexture : node.texture;
+    // Both Camera and VideoFileInput nodes use videoTexture for input
+    const textureToUse = node.videoTexture;
     
     if (!textureToUse || !gl.isTexture(textureToUse)) {
       Logger.error(`${node.type} has invalid or missing texture`);
