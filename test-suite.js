@@ -803,6 +803,85 @@ testRunner.addTest('canvasDisplay_positioning', async () => {
   deleteNode(testNode2);
 });
 
+testRunner.addTest('cursorInput_allComponents', async () => {
+  // Test that all cursor input components work correctly
+  const cursorNode = createControlInputNode('CursorInput');
+  
+  // Test that all component options are available
+  const validComponents = ['x', 'y', 'velocity', 'click'];
+  
+  for (const component of validComponents) {
+    // Set the component
+    cursorNode.params.component = component;
+    
+    // Test that the component exists in cursorComponents
+    assert(cursorComponents[component] !== undefined, 
+           `Component '${component}' should exist in cursorComponents`);
+    
+    // Test that the component has proper structure
+    assert(typeof cursorComponents[component].value === 'number',
+           `Component '${component}' should have numeric value`);
+    assert(typeof cursorComponents[component].name === 'string',
+           `Component '${component}' should have name`);
+    
+    // Test that getValue works for this component
+    const value = getValue(cursorNode);
+    assert(typeof value === 'number', 
+           `getValue should return number for component '${component}'`);
+    assert(value >= 0 && value <= 1, 
+           `Value should be in 0-1 range for component '${component}', got ${value}`);
+  }
+  
+  // Test min/max range mapping
+  cursorNode.params.component = 'x';
+  cursorNode.params.min = 0.2;
+  cursorNode.params.max = 0.8;
+  
+  // Set cursor position to simulate mouse at center
+  cursorComponents.x.value = 0.5;
+  const mappedValue = getValue(cursorNode);
+  const expectedValue = 0.2 + (0.5 * (0.8 - 0.2)); // 0.5
+  assert(Math.abs(mappedValue - expectedValue) < 0.001,
+         `Mapped value should be ${expectedValue}, got ${mappedValue}`);
+  
+  // Cleanup
+  deleteNode(cursorNode);
+});
+
+testRunner.addTest('circularDependency_selfReference', async () => {
+  // Test that self-references are detected and removed
+  const testNode = createNode('Oscillator', 100, 100);
+  
+  // Create a self-reference artificially
+  testNode.inputs[0] = testNode;
+  
+  // Call the self-reference removal function
+  const fixedCount = removeSelfReferences();
+  
+  // Verify that the self-reference was detected and removed
+  assert(fixedCount === 1, 'Should have fixed exactly 1 self-reference');
+  assert(testNode.inputs[0] === null, 'Self-reference should be removed');
+  
+  // Test with control inputs
+  testNode.controlInputs = [testNode, null];
+  const fixedCount2 = removeSelfReferences();
+  
+  assert(fixedCount2 === 1, 'Should have fixed 1 control input self-reference');
+  assert(testNode.controlInputs[0] === null, 'Control input self-reference should be removed');
+  
+  // Test that normal connections are preserved
+  const testNode2 = createNode('Noise', 200, 100);
+  testNode.inputs[0] = testNode2;
+  
+  const fixedCount3 = removeSelfReferences();
+  assert(fixedCount3 === 0, 'Should not remove valid connections');
+  assert(testNode.inputs[0] === testNode2, 'Valid connection should be preserved');
+  
+  // Cleanup
+  deleteNode(testNode);
+  deleteNode(testNode2);
+});
+
 testRunner.addTest('feedbackTrail_accumulation', async () => {
   // Regression test for FeedbackTrail effect
   const osc = createNode('Oscillator', 100, 100);

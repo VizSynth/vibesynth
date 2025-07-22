@@ -1573,6 +1573,9 @@ function init() {
 
   // Initialize update and project system (may restore saved project)
   const projectWasRestored = initUpdateSystem();
+  
+  // Remove any self-references that may exist
+  removeSelfReferences();
 
   // Only create initial node if no project was restored
   if (!projectWasRestored) {
@@ -5743,6 +5746,11 @@ function setupGraphInteraction() {
 
         // Create connection if valid
         if (connectionStart.isOutput && !isTargetOutput && targetInputIndex !== null) {
+          // Prevent self-connection
+          if (connectionStart.node === targetNode) {
+            Logger.warn(`Cannot connect node ${targetNode.name} to itself`);
+            return;
+          }
           // Output to input connection
           targetNode.inputs[targetInputIndex] = connectionStart.node;
           updateConnections();
@@ -5752,6 +5760,11 @@ function setupGraphInteraction() {
           }
           saveState(`Connect ${connectionStart.node.name} → ${targetNode.name}`);
         } else if (connectionStart.isOutput && isTargetControl && targetControlIndex !== null) {
+          // Prevent self-connection
+          if (connectionStart.node === targetNode) {
+            Logger.warn(`Cannot connect node ${targetNode.name} to itself (control)`);
+            return;
+          }
           // Output to control input connection
           if (!targetNode.controlInputs) targetNode.controlInputs = [];
           targetNode.controlInputs[targetControlIndex] = connectionStart.node;
@@ -5762,6 +5775,11 @@ function setupGraphInteraction() {
           }
           saveState(`Connect ${connectionStart.node.name} → ${targetNode.name} (control)`);
         } else if (!connectionStart.isOutput && isTargetOutput && connectionStart.inputIndex !== null) {
+          // Prevent self-connection
+          if (connectionStart.node === targetNode) {
+            Logger.warn(`Cannot connect node ${connectionStart.node.name} to itself`);
+            return;
+          }
           // Input to output connection
           connectionStart.node.inputs[connectionStart.inputIndex] = targetNode;
           updateConnections();
@@ -7510,6 +7528,42 @@ function getParamStep(key) {
 }
 
 /**
+ * Detect and remove self-references from all nodes
+ */
+function removeSelfReferences() {
+  let fixedCount = 0;
+  
+  nodes.forEach(node => {
+    // Check regular inputs
+    for (let i = 0; i < node.inputs.length; i++) {
+      if (node.inputs[i] === node) {
+        Logger.warn(`Removing self-reference from ${node.name} input ${i}`);
+        node.inputs[i] = null;
+        fixedCount++;
+      }
+    }
+    
+    // Check control inputs
+    if (node.controlInputs) {
+      for (let i = 0; i < node.controlInputs.length; i++) {
+        if (node.controlInputs[i] === node) {
+          Logger.warn(`Removing self-reference from ${node.name} control input ${i}`);
+          node.controlInputs[i] = null;
+          fixedCount++;
+        }
+      }
+    }
+  });
+  
+  if (fixedCount > 0) {
+    Logger.info(`Fixed ${fixedCount} self-reference(s)`);
+    updateConnections();
+  }
+  
+  return fixedCount;
+}
+
+/**
  * Sort nodes in dependency order using topological sort
  * Ensures nodes render after their dependencies
  */
@@ -7607,9 +7661,13 @@ function updateInputNodeValue(node, time) {
       const component = node.params.component;
       let rawCursorValue = 0;
       if (component === 'x') {
-        rawCursorValue = (mousePos.x / canvas.width);
+        rawCursorValue = cursorComponents.x.value;
       } else if (component === 'y') {
-        rawCursorValue = (mousePos.y / canvas.height);
+        rawCursorValue = cursorComponents.y.value;
+      } else if (component === 'velocity') {
+        rawCursorValue = cursorComponents.velocity.value;
+      } else if (component === 'click') {
+        rawCursorValue = cursorComponents.click.value;
       }
       // Map to configured min/max range
       const cursorMin = node.params.min || 0;
@@ -10751,6 +10809,9 @@ function deserializeProject(projectData) {
     // Restore graph state
     graphVisible = projectData.graphVisible !== false;
 
+    // Remove any self-references that may have been restored
+    removeSelfReferences();
+    
     // Update UI
     updateMainOutputDropdown();
     updateMainOutputVisualIndicator();
