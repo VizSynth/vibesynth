@@ -5,7 +5,9 @@
   "main": "script.js",
   "scripts": {
     "start": "python3 -m http.server 8080",
-    "build": "echo 'No build step required for vanilla JS'"
+    "build": "echo 'No build step required for vanilla JS'",
+    "deploy": "node deploy-docs.js",
+    "deploy:bash": "bash deploy-docs.sh"
   },
   "dependencies": {},
   "devDependencies": {},
