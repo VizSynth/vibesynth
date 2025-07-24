@@ -7,7 +7,7 @@ mkdir -p "$checkpoint_dir"
 
 # Copy all important files
 echo "Creating checkpoint: $checkpoint_dir"
-cp *.html *.js *.css *.md "$checkpoint_dir/" 2>/dev/null
+cp *.html *.js *.css *.md *.png *.ico "$checkpoint_dir/" 2>/dev/null
 
 # Show what was backed up
 echo "Backed up files:"

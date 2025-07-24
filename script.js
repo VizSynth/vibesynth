@@ -104,7 +104,7 @@ const PARAMETER_CONSTRAINTS = {
   band: { type: 'string', values: ['overall', 'bass', 'lowMids', 'mids', 'highMids', 'highs'], default: 'overall' },
   component: {
     type: 'string',
-    values: ['x', 'y', 'velocity', 'click', 'motionX', 'brightness', 'motion', 'contrast'],
+    values: ['x', 'y', 'velocity', 'click'],
     default: 'x'
   },
   deadzone: { type: 'number', min: 0, max: 0.5, step: 0.01, default: 0.1 },
