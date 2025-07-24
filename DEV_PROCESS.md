@@ -2,6 +2,44 @@
 
 This document defines our collaborative development workflow and best practices for maintaining and improving the Web Visual Synthesizer project.
 
+## 🌿 Branch Management
+
+### MANDATORY: Feature Branch Workflow
+**ALL development work MUST be done in feature branches. No direct commits to main.**
+
+### Branch Naming Convention
+Branch names should follow this pattern:
+- **Features**: `feat-<description>` (e.g., `feat-new-source-node-flowfield`)
+- **Bug fixes**: `fix-<description>` (e.g., `fix-feedback-trail-accumulation`)
+- **Refactoring**: `refactor-<description>` (e.g., `refactor-node-validation-system`)
+- **Documentation**: `docs-<description>` (e.g., `docs-update-readme`)
+- **Performance**: `perf-<description>` (e.g., `perf-optimize-render-loop`)
+
+### Branch Workflow Protocol
+1. **Propose branch name immediately** when starting work on a feature/bug
+   - As soon as you understand the task, propose: "I'll create branch `feat-xyz` for this work"
+   - Get user confirmation before proceeding
+2. **Create and switch to branch** before making ANY changes:
+   ```bash
+   git checkout -b feat-new-feature
+   ```
+3. **Work exclusively in feature branch** until feature is complete
+4. **Regular commits** within the feature branch
+5. **Create PR** when feature is ready for review
+6. **Never commit directly to main** - all changes via PR
+
+### When to Create a New Branch
+- Starting any new feature
+- Fixing any bug
+- Making any non-trivial change
+- Refactoring existing code
+- Updating documentation
+
+### Current Branch Awareness
+- Always check current branch before starting work: `git branch --show-current`
+- Include branch name in checkpoint commits
+- Notify user if working in main (should switch to feature branch)
+
 ## 🔖 Checkpoint Protocol
 
 ### Trigger Words

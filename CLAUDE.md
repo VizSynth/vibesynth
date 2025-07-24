@@ -10,15 +10,15 @@ VibeSynth is a web-based modular video synthesizer that creates real-time visual
 
 ```bash
 # Start development server
-npm start  # Runs Python HTTP server on port 8080
+npm start              # Runs Python HTTP server on port 8080
 
 # Run tests (in browser console)
-runAllTests()           # Run all tests
-runTest('testName')     # Run specific test
-createTestScenario()    # Create test nodes for manual testing
+runAllTests()          # Run all tests
+runTest('testName')    # Run specific test
+createTestScenario()   # Create test nodes for manual testing
 
 # Create checkpoint (when user requests)
-bash backup.sh              # Create timestamped backup
+bash backup.sh         # Create timestamped backup
 git add -A
 git commit -m "type: summary"  # types: feat, fix, refactor, test, docs, style, perf, chore
 ```
@@ -30,6 +30,7 @@ git commit -m "type: summary"  # types: feat, fix, refactor, test, docs, style, 
 - **index.html**: Modern UI with material design, sidebar node palette, center canvas with overlay
 - **layout.js**: Graph layout algorithms using ELK.js and Dagre for auto-layout
 - **style.css**: Dark theme UI with CSS variables
+- **test-suite.js**: Browser-based testing framework with TestRunner class
 
 ### Node Categories
 1. **Sources**: Oscillator, Noise, Shape, Camera, Plasma, Voronoi, RadialGradient, FlowField, Text, VideoFileInput
@@ -46,6 +47,17 @@ git commit -m "type: summary"  # types: feat, fix, refactor, test, docs, style, 
 
 ## Development Workflow
 
+### Branch Management (MANDATORY)
+**ALL development work MUST be done in feature branches. Never commit directly to main.**
+
+1. **Propose branch name immediately** when understanding a task
+   - Features: `feat-<description>` (e.g., `feat-audio-reactive-controls`)
+   - Bugs: `fix-<description>` (e.g., `fix-memory-leak`)
+   - Say: "I'll create branch `feat-xyz` for this work"
+2. **Create branch before ANY changes**: `git checkout -b branch-name`
+3. **Check current branch**: `git branch --show-current`
+4. **All commits go to feature branch**, PR to main when complete
+
 ### Testing Requirements
 Before any feature is complete:
 1. Add tests to `test-suite.js`
@@ -58,6 +70,7 @@ When user mentions: `[Checkpoint]`, `checkpoint`, `save progress`, `commit this`
 1. Run `bash backup.sh` to create timestamped backup
 2. Stage all changes with `git add -A`
 3. Create descriptive commit with proper format
+4. Include branch name in commit if not on main
 
 ### Code Style
 - Follow existing patterns in codebase
