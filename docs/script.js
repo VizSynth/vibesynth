@@ -9646,7 +9646,7 @@ function startCursorTracking() {
 
     // Clamp to 0-1 range
     cursorComponents.x.value = Math.max(0, Math.min(1, x));
-    cursorComponents.y.value = Math.max(0, Math.min(1, y));
+    cursorComponents.y.value = Math.max(0, Math.min(1, 1 - y));
 
     // Calculate velocity
     const now = Date.now();
