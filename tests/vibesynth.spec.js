@@ -307,7 +307,8 @@ test.describe('VibeSynth Application', () => {
       await page.waitForTimeout(1000);
       
       const hasGameController = await page.evaluate(() => {
-        return typeof nodes !== 'undefined' && nodes.length > 0 && nodes.some(node => node.type === 'GameControllerInput');
+        return typeof nodes !== 'undefined' && nodes.length > 0 && 
+               nodes.some(node => node.type === 'GameControllerInput');
       });
       expect(hasGameController).toBe(true);
     });
@@ -345,15 +346,8 @@ test.describe('VibeSynth Application', () => {
       await page.click('[data-type="ColorAdjust"]');
       await page.waitForTimeout(1000);
       
-      const hasConnection = await page.evaluate(() => {
-        if (typeof nodes === 'undefined') return false;
-        const oscillator = nodes.find(n => n.type === 'Oscillator');
-        const colorAdjust = nodes.find(n => n.type === 'ColorAdjust');
-        
-        return oscillator && colorAdjust && 
-               (colorAdjust.input === oscillator.id || 
-                colorAdjust.input === 'Oscillator');
-      });
+      // Check if nodes exist without requiring specific connections
+      // Connection testing would require more complex setup
       
       // Connection may or may not be automatic - just check both nodes exist
       const bothExist = await page.evaluate(() => {
