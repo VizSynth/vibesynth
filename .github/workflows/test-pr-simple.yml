@@ -1,0 +1,15 @@
+name: Simple PR Test
+
+on:
+  pull_request:
+    branches: [feat-Simba-PR-preview]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test PR trigger
+        run: |
+          echo "PR trigger working!"
+          echo "PR number: ${{ github.event.number }}"
+          echo "Event action: ${{ github.event.action }}"
