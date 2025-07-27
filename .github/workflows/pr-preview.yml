@@ -3,6 +3,7 @@ name: PR Preview Deploy
 on:
   pull_request:
     types: [opened, synchronize, reopened, closed]
+    branches: [feat-Simba-PR-preview]
 
 jobs:
   deploy-preview:
