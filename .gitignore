@@ -2,7 +2,6 @@
 checkpoint-*/
 *.backup
 *.bak
-docs/
 
 # OS files
 .DS_Store
