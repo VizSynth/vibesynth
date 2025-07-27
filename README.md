@@ -1,6 +1,60 @@
-# vibesynth
+# VibeSynth
 
-vibesynth is a **web-based modular video synthesizer**. It lets you create realtime visual effects and synthesize video by patching together sources and effects in your browser. The app is implemented in JavaScript with WebGL for high-performance graphics, ensuring cross-platform compatibility (runs on modern browsers on any OS). The design takes inspiration from tools like **Hydra** (live-coded browser synth) and the **Video Synthesis Ecosphere RPI** by Andrei Jay, using multiple framebuffers to mix and chain visual outputs. The interface is analogous to analog modular synths – instead of audio, you connect **video source modules** and **effect modules** in a patch.
+VibeSynth is a **web-based modular video synthesizer** with professional CI/CD and automated deployment. Create real-time visual effects by patching together sources and effects in your browser. Built with JavaScript and WebGL for high-performance graphics, ensuring cross-platform compatibility on modern browsers.
+
+## 🚀 Live Demo
+Visit **[vibesynth.one](https://vibesynth.one)** to try VibeSynth directly in your browser!
+
+## 🔧 Development Workflow
+
+### Quick Start for Developers
+```bash
+# Clone the repository
+git clone https://github.com/VizSynth/vibesynth.git
+cd vibesynth
+
+# Install dependencies
+npm install
+
+# Start development server
+npm start
+
+# Deploy your changes
+./deploy.sh --branch "feat-my-feature"
+```
+
+### Automated Deployment
+VibeSynth features a fully automated CI/CD pipeline:
+
+```bash
+# Deploy any feature with automatic testing
+./deploy.sh --branch "feat-new-node-type"
+
+# Deploy with custom commit message
+./deploy.sh --branch "fix-performance" --message "fix: optimize render loop for better FPS"
+
+# Deploy docs-only changes (skip tests)
+./deploy.sh --branch "docs-update" --skip-tests
+```
+
+**What happens automatically:**
+- 📝 Builds documentation
+- 💾 Creates checkpoint backup
+- 🧪 Runs comprehensive test suite (Playwright + ESLint)
+- 🚫 **Blocks deployment if tests fail**
+- 🌿 Creates/switches to target branch
+- 📤 Commits and pushes to GitHub
+- 🤖 Triggers CI/CD pipeline
+- 🚀 Auto-deploys to appropriate environment
+
+### Testing & Quality Assurance
+- **Browser Tests**: 9 Playwright test scenarios covering UI, WebGL, and interactions
+- **Code Quality**: ESLint checks for syntax and best practices
+- **Security**: Automated vulnerability scanning
+- **Performance**: Memory and render performance monitoring
+- **Zero-downtime**: Tests must pass before any deployment
+
+The project takes inspiration from **Hydra** and **Video Synthesis Ecosphere RPI** by Andrei Jay, using multiple framebuffers to mix and chain visual outputs. The interface is analogous to analog modular synths – instead of audio, you connect **video source modules** and **effect modules** in a patch.
 
 ## Features
 

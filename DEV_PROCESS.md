@@ -19,12 +19,19 @@ Branch names should follow this pattern:
 1. **Propose branch name immediately** when starting work on a feature/bug
    - As soon as you understand the task, propose: "I'll create branch `feat-xyz` for this work"
    - Get user confirmation before proceeding
-2. **Create and switch to branch** before making ANY changes:
+2. **Use deploy.sh for automated workflow**:
    ```bash
-   git checkout -b feat-new-feature
+   ./deploy.sh --branch "feat-new-feature"
    ```
+   This automatically:
+   - Builds documentation
+   - Creates checkpoint backup
+   - Runs tests locally
+   - Creates/switches to target branch
+   - Commits and pushes changes
+   - Triggers CI/CD pipeline
 3. **Work exclusively in feature branch** until feature is complete
-4. **Regular commits** within the feature branch
+4. **Regular commits** within the feature branch using deploy.sh
 5. **Create PR** when feature is ready for review
 6. **Never commit directly to main** - all changes via PR
 
@@ -40,7 +47,42 @@ Branch names should follow this pattern:
 - Include branch name in checkpoint commits
 - Notify user if working in main (should switch to feature branch)
 
-## 🔖 Checkpoint Protocol
+## 🚀 Automated Deployment with deploy.sh
+
+### Quick Deploy
+For any branch with your current changes:
+```bash
+./deploy.sh --branch "feat-my-feature"
+```
+
+### Deploy Options
+```bash
+# Basic deployment
+./deploy.sh --branch "feat-new-feature"
+
+# With custom commit message
+./deploy.sh --branch "fix-bug" --message "fix: resolve memory leak in texture cleanup"
+
+# Skip tests (for documentation-only changes)
+./deploy.sh --branch "docs-update" --skip-tests
+
+# Skip docs build
+./deploy.sh --branch "feat-performance" --skip-docs
+```
+
+### What deploy.sh Does Automatically
+1. ✅ **Builds documentation** (unless --skip-docs)
+2. ✅ **Creates checkpoint backup** via backup.sh
+3. ✅ **Runs full test suite** (unless --skip-tests)
+4. ✅ **Fails deployment if tests fail**
+5. ✅ **Creates/switches to target branch**
+6. ✅ **Stages all changes**
+7. ✅ **Commits with descriptive message**
+8. ✅ **Pushes to remote with tracking**
+9. 🤖 **Triggers GitHub Actions CI/CD**
+10. 🤖 **Auto-deploys if tests pass**
+
+## 🔖 Manual Checkpoint Protocol (Legacy)
 
 ### Trigger Words
 When the user writes any of the following, create an immediate git checkpoint:
@@ -50,15 +92,15 @@ When the user writes any of the following, create an immediate git checkpoint:
 - `save progress`
 - `commit this`
 
-### Checkpoint Actions
-1. **Stage all changes**: `git add -A`
-2. **Create descriptive commit**: Include:
-   - What was changed/added/fixed
-   - Current state of features
-   - Any known issues
-   - Next steps if applicable
-3. **Update DEVELOPMENT.md**: Add entry with timestamp and changes
-4. **Verify commit**: Show git log entry to confirm
+**Note**: Consider using `deploy.sh` instead for automated workflow!
+
+### Manual Checkpoint Actions
+1. **Use deploy.sh**: `./deploy.sh --branch "current-branch-name"`
+2. **Or manually**:
+   - Stage all changes: `git add -A`
+   - Create descriptive commit
+   - Update DEVELOPMENT.md with timestamp and changes
+   - Verify commit: Show git log entry to confirm
 
 ### Commit Message Format
 ```
@@ -72,20 +114,42 @@ When the user writes any of the following, create an immediate git checkpoint:
 
 Types: feat, fix, refactor, test, docs, style, perf, chore
 
-## 🧪 Testing Requirements
+## 🧪 Testing Requirements & CI/CD
 
-### Before Any Feature is Considered Complete
-1. **Unit Tests**: Test individual functions/components
-2. **Integration Tests**: Test node connections and data flow
-3. **Visual Tests**: Verify rendering output matches expectations
-4. **Performance Tests**: Ensure no memory leaks or performance regressions
-5. **Edge Case Tests**: Invalid inputs, extreme values, rapid interactions
+### Automated Testing Pipeline
+The project uses comprehensive CI/CD with GitHub Actions:
+- **Every push triggers tests** automatically
+- **Playwright browser tests** - 9 test scenarios
+- **ESLint code quality** checks
+- **Security scanning** for vulnerabilities
+- **Auto-deployment** to environments when tests pass
+- **Deployment blocking** when tests fail
+
+### Test Types
+1. **Browser Tests** (Playwright): Application loading, UI interactions, WebGL rendering
+2. **Code Quality** (ESLint): Syntax, style, and best practices
+3. **Security** (npm audit): Dependency vulnerabilities
+4. **Performance** (manual): Memory usage, render performance
+
+### Running Tests Locally
+```bash
+# Run all tests (includes server setup)
+npm test
+
+# Run specific test suite
+npm run test:playwright
+npm run lint
+
+# Deploy.sh automatically runs tests before deployment
+./deploy.sh --branch "feat-test" # Tests run automatically
+./deploy.sh --branch "docs-only" --skip-tests # Skip for docs-only changes
+```
 
 ### Test Implementation
-- Add tests to `test-suite.js`
-- Run all tests after changes
-- Document test coverage in commits
-- Fix any failing tests before moving on
+- **Browser tests**: Add to `tests/vibesynth.spec.js`
+- **New features**: Always add corresponding tests
+- **CI/CD ensures**: No broken code reaches production
+- **Test failures**: Block all deployments automatically
 
 ## 🔄 Continuous Improvement
 
