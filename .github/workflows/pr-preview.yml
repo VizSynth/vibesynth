@@ -71,14 +71,14 @@ jobs:
               comment.body.includes('🔍 PR Preview') && comment.user.type === 'Bot'
             );
             
-            const commentBody = `🔍 **PR Preview Deploy**
+            const commentBody = \`🔍 **PR Preview Deploy**
             
-**✅ Preview URL:** ${previewUrl}
+**✅ Preview URL:** \${previewUrl}
 
 🎹 Test the VibeSynth changes live! The preview updates automatically when you push new commits.
 
 ---
-*Preview powered by GitHub Pages*`;
+*Preview powered by GitHub Pages*\`;
 
             if (existingComment) {
               // Update existing comment
@@ -147,12 +147,12 @@ jobs:
             );
             
             if (existingComment) {
-              const commentBody = `🔍 **PR Preview Deploy**
+              const commentBody = \`🔍 **PR Preview Deploy**
               
-**🗑️ Preview Cleaned Up** - This PR has been ${context.payload.pull_request.merged ? 'merged' : 'closed'}.
+**🗑️ Preview Cleaned Up** - This PR has been \${context.payload.pull_request.merged ? 'merged' : 'closed'}.
 
 ---
-*Preview was powered by GitHub Pages*`;
+*Preview was powered by GitHub Pages*\`;
 
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
