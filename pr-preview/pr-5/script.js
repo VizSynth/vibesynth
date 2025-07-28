@@ -8234,7 +8234,9 @@ function renderNode(node, time) {
       gl.bindTexture(gl.TEXTURE_2D, currentTexture);
     }
     
-    // Don't return - let it render normally with the texture
+    // IMPORTANT: Return early for Text nodes - they don't need standard WebGL rendering
+    // The texture has been uploaded and is ready to be used by other nodes
+    return;
   }
 
   // Handle input nodes - they just update values and don't render
