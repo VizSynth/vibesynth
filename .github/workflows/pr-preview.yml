@@ -7,7 +7,7 @@ on:
       - reopened  
       - synchronize
       - closed
-    branches: [feat-Simba-PR-preview]
+    branches: [main]
 
 concurrency: preview-${{ github.ref }}
 
