@@ -161,18 +161,15 @@ jobs:
       with:
         node-version: '18'
         
-    - name: "🏗️ Run deploy script"
-      run: |
-        chmod +x deploy-docs.sh
-        ./deploy-docs.sh
-        
     - name: "🎯 Deploy to GitHub Pages (Staging)"
       uses: peaceiris/actions-gh-pages@v3
       with:
         personal_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./docs
+        publish_dir: .
         publish_branch: gh-pages
-        force_orphan: true
+        force_orphan: false
+        keep_files: true
+        exclude_assets: '.git,.github,node_modules,test-results,playwright-report,checkpoint-*'
         user_name: 'github-actions[bot]'
         user_email: 'github-actions[bot]@users.noreply.github.com'
         
