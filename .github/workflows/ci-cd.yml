@@ -16,6 +16,8 @@ jobs:
     steps:
     - name: "📥 Checkout code"
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
       
     - name: "⚙️ Setup Node.js"
       uses: actions/setup-node@v4
@@ -101,10 +103,16 @@ jobs:
        contains(github.ref, 'refs/heads/refactor-')) && 
       github.event_name == 'push'
     environment: development
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
     
     steps:
     - name: "📥 Checkout code"
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
       
     - name: "⚙️ Setup Node.js"
       uses: actions/setup-node@v4
@@ -135,10 +143,16 @@ jobs:
     needs: [test, lint, security]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: staging
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
     
     steps:
     - name: "📥 Checkout code"
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
       
     - name: "⚙️ Setup Node.js"
       uses: actions/setup-node@v4
@@ -169,10 +183,16 @@ jobs:
     needs: [test, lint, security]
     if: github.event_name == 'release'
     environment: production
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
     
     steps:
     - name: "📥 Checkout code"
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
       
     - name: "⚙️ Setup Node.js"
       uses: actions/setup-node@v4
