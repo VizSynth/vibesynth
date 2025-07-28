@@ -1276,7 +1276,7 @@ class SynthNode {
       },
       Text: {
         inputs: [],
-        params: { text: 'VibeSynth', font: 'Inter Bold 64pt', fillColor: '#ffffff' },
+        params: { text: 'VibeSynth', font: 'Inter Bold 64pt', fillColor: '#00ffff' },
         icon: 'text_fields',
         category: 'source'
       },
@@ -8154,85 +8154,45 @@ function renderNode(node, time) {
       node.textCanvas.height = canvas.height;
     }
     
-    // Clear canvas (transparent background)
+    // Clear canvas
     node.textCtx.clearRect(0, 0, node.textCanvas.width, node.textCanvas.height);
     
-    // DEBUG: Add a visible background rectangle to test if canvas works at all
-    node.textCtx.fillStyle = 'rgba(255, 0, 0, 0.2)'; // Semi-transparent red
+    // Add a subtle background to make text visible
+    node.textCtx.fillStyle = 'rgba(0, 0, 0, 0.1)';
     node.textCtx.fillRect(0, 0, node.textCanvas.width, node.textCanvas.height);
     
-    // Set text properties - make it VERY visible
-    const fontSize = Math.min(node.textCanvas.width, node.textCanvas.height) / 4; // Even larger text
-    node.textCtx.font = node.params.font || `900 ${fontSize}px Arial`; // Use Arial as fallback, 900 weight
+    // Set text properties
+    const fontSize = Math.min(node.textCanvas.width, node.textCanvas.height) / 8; // Responsive font size
+    node.textCtx.font = node.params.font || `Bold ${fontSize}px Inter`;
+    node.textCtx.fillStyle = node.params.fillColor || '#00ffff';
     node.textCtx.textAlign = 'center';
     node.textCtx.textBaseline = 'middle';
-    
-    const textToDraw = node.params.text || 'VibeSynth';
-    const centerX = node.textCanvas.width / 2;
-    const centerY = node.textCanvas.height / 2;
-    
-    // Draw multiple stroke layers for maximum visibility
-    node.textCtx.strokeStyle = '#000000';
-    node.textCtx.lineWidth = 8;
-    node.textCtx.strokeText(textToDraw, centerX, centerY);
-    
-    node.textCtx.strokeStyle = '#333333';
-    node.textCtx.lineWidth = 6;
-    node.textCtx.strokeText(textToDraw, centerX, centerY);
-    
-    // Draw the main text with bright color
-    node.textCtx.fillStyle = node.params.fillColor || '#ffffff';
-    node.textCtx.shadowColor = 'rgba(0, 0, 0, 1.0)';
-    node.textCtx.shadowBlur = 10;
+    node.textCtx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    node.textCtx.shadowBlur = 6;
     node.textCtx.shadowOffsetX = 3;
     node.textCtx.shadowOffsetY = 3;
-    node.textCtx.fillText(textToDraw, centerX, centerY);
     
-    // Add a bright highlight
-    node.textCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    node.textCtx.shadowColor = 'transparent';
-    node.textCtx.fillText(textToDraw, centerX - 1, centerY - 1);
+    // Draw text
+    const textToDraw = node.params.text || 'VibeSynth';
+    node.textCtx.fillText(
+      textToDraw,
+      node.textCanvas.width / 2,
+      node.textCanvas.height / 2
+    );
     
-    // Debug: Log text rendering details
-    Logger.info(`Text node ${node.name} rendered: "${textToDraw}" at ${fontSize}px`);
-    Logger.info(`Canvas size: ${node.textCanvas.width}x${node.textCanvas.height}`);
-    Logger.info(`Text position: ${centerX}, ${centerY}`);
-    Logger.info(`Fill color: ${node.textCtx.fillStyle}`);
+    // Add white stroke for better visibility
+    node.textCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    node.textCtx.lineWidth = 2;
+    node.textCtx.strokeText(
+      textToDraw,
+      node.textCanvas.width / 2,
+      node.textCanvas.height / 2
+    );
     
-    // Debug: Try to read back canvas data to verify it has content
-    const imageData = node.textCtx.getImageData(centerX-50, centerY-50, 100, 100);
-    const hasContent = imageData.data.some(pixel => pixel > 0);
-    Logger.info(`Canvas has content: ${hasContent}`);
-    
-    // Save current WebGL state before texture upload
-    const currentTexture = gl.getParameter(gl.TEXTURE_BINDING_2D);
-    const currentActiveTexture = gl.getParameter(gl.ACTIVE_TEXTURE);
-    
-    // Upload canvas to texture with proper state management
-    gl.activeTexture(gl.TEXTURE0);
+    // Upload canvas to texture
     gl.bindTexture(gl.TEXTURE_2D, node.texture);
-    
-    // Check for errors before texture upload
-    let error = gl.getError();
-    if (error !== gl.NO_ERROR) {
-      Logger.error(`WebGL error before texture upload: ${error}`);
-    }
-    
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, node.textCanvas);
     setTextureParams();
-    
-    // Check for errors after texture upload
-    error = gl.getError();
-    Logger.info(`Texture uploaded successfully: ${error === gl.NO_ERROR}`);
-    if (error !== gl.NO_ERROR) {
-      Logger.error(`WebGL error after texture upload: ${error}`);
-    }
-    
-    // Restore previous WebGL state
-    gl.activeTexture(currentActiveTexture);
-    if (currentTexture) {
-      gl.bindTexture(gl.TEXTURE_2D, currentTexture);
-    }
     
     // Don't return - let it render normally with the texture
   }
