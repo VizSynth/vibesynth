@@ -104,7 +104,7 @@ const PARAMETER_CONSTRAINTS = {
   band: { type: 'string', values: ['overall', 'bass', 'lowMids', 'mids', 'highMids', 'highs'], default: 'overall' },
   component: {
     type: 'string',
-    values: ['x', 'y', 'velocity', 'click', 'motionX', 'brightness', 'motion', 'contrast'],
+    values: ['x', 'y', 'velocity', 'click'],
     default: 'x'
   },
   deadzone: { type: 'number', min: 0, max: 0.5, step: 0.01, default: 0.1 },
@@ -1276,7 +1276,7 @@ class SynthNode {
       },
       Text: {
         inputs: [],
-        params: { text: 'Hello', font: 'Inter Bold 96pt', fillColor: '#ffffff' },
+        params: { text: 'VibeSynth', font: 'Inter Bold 64pt', fillColor: '#ffffff' },
         icon: 'text_fields',
         category: 'source'
       },
@@ -1573,6 +1573,9 @@ function init() {
 
   // Initialize update and project system (may restore saved project)
   const projectWasRestored = initUpdateSystem();
+  
+  // Remove any self-references that may exist
+  removeSelfReferences();
 
   // Only create initial node if no project was restored
   if (!projectWasRestored) {
@@ -5743,6 +5746,11 @@ function setupGraphInteraction() {
 
         // Create connection if valid
         if (connectionStart.isOutput && !isTargetOutput && targetInputIndex !== null) {
+          // Prevent self-connection
+          if (connectionStart.node === targetNode) {
+            Logger.warn(`Cannot connect node ${targetNode.name} to itself`);
+            return;
+          }
           // Output to input connection
           targetNode.inputs[targetInputIndex] = connectionStart.node;
           updateConnections();
@@ -5752,6 +5760,11 @@ function setupGraphInteraction() {
           }
           saveState(`Connect ${connectionStart.node.name} → ${targetNode.name}`);
         } else if (connectionStart.isOutput && isTargetControl && targetControlIndex !== null) {
+          // Prevent self-connection
+          if (connectionStart.node === targetNode) {
+            Logger.warn(`Cannot connect node ${targetNode.name} to itself (control)`);
+            return;
+          }
           // Output to control input connection
           if (!targetNode.controlInputs) targetNode.controlInputs = [];
           targetNode.controlInputs[targetControlIndex] = connectionStart.node;
@@ -5762,6 +5775,11 @@ function setupGraphInteraction() {
           }
           saveState(`Connect ${connectionStart.node.name} → ${targetNode.name} (control)`);
         } else if (!connectionStart.isOutput && isTargetOutput && connectionStart.inputIndex !== null) {
+          // Prevent self-connection
+          if (connectionStart.node === targetNode) {
+            Logger.warn(`Cannot connect node ${connectionStart.node.name} to itself`);
+            return;
+          }
           // Input to output connection
           connectionStart.node.inputs[connectionStart.inputIndex] = targetNode;
           updateConnections();
@@ -7510,6 +7528,42 @@ function getParamStep(key) {
 }
 
 /**
+ * Detect and remove self-references from all nodes
+ */
+function removeSelfReferences() {
+  let fixedCount = 0;
+  
+  nodes.forEach(node => {
+    // Check regular inputs
+    for (let i = 0; i < node.inputs.length; i++) {
+      if (node.inputs[i] === node) {
+        Logger.warn(`Removing self-reference from ${node.name} input ${i}`);
+        node.inputs[i] = null;
+        fixedCount++;
+      }
+    }
+    
+    // Check control inputs
+    if (node.controlInputs) {
+      for (let i = 0; i < node.controlInputs.length; i++) {
+        if (node.controlInputs[i] === node) {
+          Logger.warn(`Removing self-reference from ${node.name} control input ${i}`);
+          node.controlInputs[i] = null;
+          fixedCount++;
+        }
+      }
+    }
+  });
+  
+  if (fixedCount > 0) {
+    Logger.info(`Fixed ${fixedCount} self-reference(s)`);
+    updateConnections();
+  }
+  
+  return fixedCount;
+}
+
+/**
  * Sort nodes in dependency order using topological sort
  * Ensures nodes render after their dependencies
  */
@@ -7607,9 +7661,13 @@ function updateInputNodeValue(node, time) {
       const component = node.params.component;
       let rawCursorValue = 0;
       if (component === 'x') {
-        rawCursorValue = (mousePos.x / canvas.width);
+        rawCursorValue = cursorComponents.x.value;
       } else if (component === 'y') {
-        rawCursorValue = (mousePos.y / canvas.height);
+        rawCursorValue = cursorComponents.y.value;
+      } else if (component === 'velocity') {
+        rawCursorValue = cursorComponents.velocity.value;
+      } else if (component === 'click') {
+        rawCursorValue = cursorComponents.click.value;
       }
       // Map to configured min/max range
       const cursorMin = node.params.min || 0;
@@ -7970,10 +8028,87 @@ function renderFinalOutput() {
   }
 }
 
+// Dedicated function for rendering Text nodes to avoid WebGL conflicts
+function renderTextNode(node) {
+  if (!node.textCanvas) {
+    node.textCanvas = document.createElement('canvas');
+    node.textCtx = node.textCanvas.getContext('2d');
+  }
+  
+  // Update canvas size if resolution changed
+  if (node.textCanvas.width !== canvas.width || node.textCanvas.height !== canvas.height) {
+    node.textCanvas.width = canvas.width;
+    node.textCanvas.height = canvas.height;
+  }
+  
+  // Clear canvas (transparent background)
+  node.textCtx.clearRect(0, 0, node.textCanvas.width, node.textCanvas.height);
+  
+  // Set text properties - make it VERY visible
+  const fontSize = Math.min(node.textCanvas.width, node.textCanvas.height) / 4; // Even larger text
+  node.textCtx.font = node.params.font || `900 ${fontSize}px Arial`; // Use Arial as fallback, 900 weight
+  node.textCtx.textAlign = 'center';
+  node.textCtx.textBaseline = 'middle';
+  
+  const textToDraw = node.params.text || 'VibeSynth';
+  const centerX = node.textCanvas.width / 2;
+  const centerY = node.textCanvas.height / 2;
+  
+  // Draw multiple stroke layers for maximum visibility
+  node.textCtx.strokeStyle = '#000000';
+  node.textCtx.lineWidth = 8;
+  node.textCtx.strokeText(textToDraw, centerX, centerY);
+  
+  node.textCtx.strokeStyle = '#333333';
+  node.textCtx.lineWidth = 6;
+  node.textCtx.strokeText(textToDraw, centerX, centerY);
+  
+  // Draw the main text with bright color
+  node.textCtx.fillStyle = node.params.fillColor || '#ffffff';
+  node.textCtx.shadowColor = 'rgba(0, 0, 0, 1.0)';
+  node.textCtx.shadowBlur = 10;
+  node.textCtx.shadowOffsetX = 3;
+  node.textCtx.shadowOffsetY = 3;
+  node.textCtx.fillText(textToDraw, centerX, centerY);
+  
+  // Add a bright highlight
+  node.textCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+  node.textCtx.shadowColor = 'transparent';
+  node.textCtx.fillText(textToDraw, centerX - 1, centerY - 1);
+  
+  // Debug: Log text rendering
+  Logger.info(`Text node ${node.name} rendered: "${textToDraw}" at ${fontSize}px`);
+  
+  // Save current WebGL state before texture upload
+  const currentTexture = gl.getParameter(gl.TEXTURE_BINDING_2D);
+  const currentActiveTexture = gl.getParameter(gl.ACTIVE_TEXTURE);
+  
+  // Upload canvas to texture with proper state management
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, node.texture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, node.textCanvas);
+  setTextureParams();
+  
+  // Restore previous WebGL state
+  gl.activeTexture(currentActiveTexture);
+  if (currentTexture) {
+    gl.bindTexture(gl.TEXTURE_2D, currentTexture);
+  }
+  
+  // Clear any WebGL errors
+  gl.getError();
+}
+
 function renderNode(node, time) {
   // Skip deleted nodes
   if (node.deleted) {
     return;
+  }
+  
+  // Handle Text nodes FIRST - before any WebGL operations to avoid GL_INVALID_OPERATION
+  if (node.type === 'Text') {
+    renderTextNode(node);
+    return; // Exit immediately - Text nodes don't need standard WebGL rendering
   }
   
   // Debug Camera nodes (only if trace logging enabled)
@@ -8083,38 +8218,7 @@ function renderNode(node, time) {
   }
   
   
-  // Handle Text node - render text to canvas then upload as texture
-  if (node.type === 'Text') {
-    if (!node.textCanvas) {
-      node.textCanvas = document.createElement('canvas');
-      node.textCanvas.width = canvas.width;
-      node.textCanvas.height = canvas.height;
-      node.textCtx = node.textCanvas.getContext('2d');
-    }
-    
-    // Clear canvas
-    node.textCtx.clearRect(0, 0, node.textCanvas.width, node.textCanvas.height);
-    
-    // Set text properties
-    node.textCtx.font = node.params.font || 'Inter Bold 96pt';
-    node.textCtx.fillStyle = node.params.fillColor || '#ffffff';
-    node.textCtx.textAlign = 'center';
-    node.textCtx.textBaseline = 'middle';
-    
-    // Draw text
-    node.textCtx.fillText(
-      node.params.text || 'Hello',
-      node.textCanvas.width / 2,
-      node.textCanvas.height / 2
-    );
-    
-    // Upload canvas to texture
-    gl.bindTexture(gl.TEXTURE_2D, node.texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, node.textCanvas);
-    setTextureParams();
-    
-    // Don't return - let it render normally with the texture
-  }
+  // Text nodes are handled at the beginning of renderNode function
 
   // Handle input nodes - they just update values and don't render
   if (node.category === 'input') {
@@ -10751,6 +10855,9 @@ function deserializeProject(projectData) {
     // Restore graph state
     graphVisible = projectData.graphVisible !== false;
 
+    // Remove any self-references that may have been restored
+    removeSelfReferences();
+    
     // Update UI
     updateMainOutputDropdown();
     updateMainOutputVisualIndicator();
