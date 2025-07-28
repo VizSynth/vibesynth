@@ -452,7 +452,7 @@ html, body {
   position: absolute;
   min-width: 140px;
   max-width: 180px;
-  background: var(--bg-secondary);
+  background: var(--bg-secondary) !important;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   box-shadow: var(--shadow);
@@ -618,6 +618,7 @@ html, body {
 
 .node-body {
   padding: 10px 8px;
+  background: var(--bg-secondary) !important;
 }
 
 /* Node Ports */
