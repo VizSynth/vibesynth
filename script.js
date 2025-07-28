@@ -8044,6 +8044,11 @@ function renderTextNode(node) {
   // Clear canvas (transparent background)
   node.textCtx.clearRect(0, 0, node.textCanvas.width, node.textCanvas.height);
   
+  // Save the context state and flip the Y-axis to match WebGL coordinate system
+  node.textCtx.save();
+  node.textCtx.scale(1, -1);
+  node.textCtx.translate(0, -node.textCanvas.height);
+  
   // Set text properties - make it VERY visible
   const fontSize = Math.min(node.textCanvas.width, node.textCanvas.height) / 4; // Even larger text
   node.textCtx.font = node.params.font || `900 ${fontSize}px Arial`; // Use Arial as fallback, 900 weight
@@ -8075,6 +8080,9 @@ function renderTextNode(node) {
   node.textCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
   node.textCtx.shadowColor = 'transparent';
   node.textCtx.fillText(textToDraw, centerX - 1, centerY - 1);
+  
+  // Restore the context state
+  node.textCtx.restore();
   
   // Debug: Log text rendering
   Logger.info(`Text node ${node.name} rendered: "${textToDraw}" at ${fontSize}px`);
