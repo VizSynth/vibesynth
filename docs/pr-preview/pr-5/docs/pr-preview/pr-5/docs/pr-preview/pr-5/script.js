@@ -1276,7 +1276,7 @@ class SynthNode {
       },
       Text: {
         inputs: [],
-        params: { text: 'VibeSynth', font: 'Inter Bold 64pt', fillColor: '#00ffff' },
+        params: { text: 'Hello', font: 'Inter Bold 96pt', fillColor: '#ffffff' },
         icon: 'text_fields',
         category: 'source'
       },
@@ -8145,31 +8145,23 @@ function renderNode(node, time) {
   if (node.type === 'Text') {
     if (!node.textCanvas) {
       node.textCanvas = document.createElement('canvas');
-      node.textCtx = node.textCanvas.getContext('2d');
-    }
-    
-    // Update canvas size if resolution changed
-    if (node.textCanvas.width !== canvas.width || node.textCanvas.height !== canvas.height) {
       node.textCanvas.width = canvas.width;
       node.textCanvas.height = canvas.height;
+      node.textCtx = node.textCanvas.getContext('2d');
     }
     
     // Clear canvas
     node.textCtx.clearRect(0, 0, node.textCanvas.width, node.textCanvas.height);
     
     // Set text properties
-    node.textCtx.font = node.params.font || 'Inter Bold 64pt';
-    node.textCtx.fillStyle = node.params.fillColor || '#00ffff';
+    node.textCtx.font = node.params.font || 'Inter Bold 96pt';
+    node.textCtx.fillStyle = node.params.fillColor || '#ffffff';
     node.textCtx.textAlign = 'center';
     node.textCtx.textBaseline = 'middle';
-    node.textCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    node.textCtx.shadowBlur = 4;
-    node.textCtx.shadowOffsetX = 2;
-    node.textCtx.shadowOffsetY = 2;
     
     // Draw text
     node.textCtx.fillText(
-      node.params.text || 'VibeSynth',
+      node.params.text || 'Hello',
       node.textCanvas.width / 2,
       node.textCanvas.height / 2
     );
