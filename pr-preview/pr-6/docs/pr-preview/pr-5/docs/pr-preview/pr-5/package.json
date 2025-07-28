@@ -1,0 +1,34 @@
+{
+  "name": "web-visual-synthesizer",
+  "version": "1.0.0",
+  "description": "A web-based visual synthesizer with node-based graph editing",
+  "main": "script.js",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "build": "echo 'No build step required for vanilla JS'",
+    "deploy": "node deploy-docs.js",
+    "deploy:bash": "bash deploy-docs.sh",
+    "test": "npm run test:check-server || npm run test:with-server",
+    "test:check-server": "curl -s http://127.0.0.1:8080 > /dev/null && playwright test --config=playwright.existing.config.js",
+    "test:with-server": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "lint": "eslint script.js layout.js",
+    "lint:fix": "eslint script.js layout.js --fix",
+    "ci": "npm run lint && npm run test",
+    "precommit": "npm run lint"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "eslint": "^8.50.0"
+  },
+  "keywords": [
+    "visual-synthesizer",
+    "webgl",
+    "node-editor",
+    "graph-layout"
+  ],
+  "author": "",
+  "license": "MIT"
+}
