@@ -8157,35 +8157,40 @@ function renderNode(node, time) {
     // Clear canvas (transparent background)
     node.textCtx.clearRect(0, 0, node.textCanvas.width, node.textCanvas.height);
     
-    // Set text properties
-    const fontSize = Math.min(node.textCanvas.width, node.textCanvas.height) / 6; // Larger text
-    node.textCtx.font = node.params.font || `Bold ${fontSize}px Inter`;
-    node.textCtx.fillStyle = node.params.fillColor || '#ffffff'; // White by default for visibility
+    // Set text properties - make it VERY visible
+    const fontSize = Math.min(node.textCanvas.width, node.textCanvas.height) / 4; // Even larger text
+    node.textCtx.font = node.params.font || `900 ${fontSize}px Arial`; // Use Arial as fallback, 900 weight
     node.textCtx.textAlign = 'center';
     node.textCtx.textBaseline = 'middle';
     
-    // Strong shadow for visibility on any background
-    node.textCtx.shadowColor = 'rgba(0, 0, 0, 1.0)';
-    node.textCtx.shadowBlur = 8;
-    node.textCtx.shadowOffsetX = 4;
-    node.textCtx.shadowOffsetY = 4;
-    
-    // Draw text
     const textToDraw = node.params.text || 'VibeSynth';
-    node.textCtx.fillText(
-      textToDraw,
-      node.textCanvas.width / 2,
-      node.textCanvas.height / 2
-    );
+    const centerX = node.textCanvas.width / 2;
+    const centerY = node.textCanvas.height / 2;
     
-    // Add strong black stroke outline for maximum visibility
-    node.textCtx.strokeStyle = 'rgba(0, 0, 0, 1.0)';
-    node.textCtx.lineWidth = 4;
-    node.textCtx.strokeText(
-      textToDraw,
-      node.textCanvas.width / 2,
-      node.textCanvas.height / 2
-    );
+    // Draw multiple stroke layers for maximum visibility
+    node.textCtx.strokeStyle = '#000000';
+    node.textCtx.lineWidth = 8;
+    node.textCtx.strokeText(textToDraw, centerX, centerY);
+    
+    node.textCtx.strokeStyle = '#333333';
+    node.textCtx.lineWidth = 6;
+    node.textCtx.strokeText(textToDraw, centerX, centerY);
+    
+    // Draw the main text with bright color
+    node.textCtx.fillStyle = node.params.fillColor || '#ffffff';
+    node.textCtx.shadowColor = 'rgba(0, 0, 0, 1.0)';
+    node.textCtx.shadowBlur = 10;
+    node.textCtx.shadowOffsetX = 3;
+    node.textCtx.shadowOffsetY = 3;
+    node.textCtx.fillText(textToDraw, centerX, centerY);
+    
+    // Add a bright highlight
+    node.textCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    node.textCtx.shadowColor = 'transparent';
+    node.textCtx.fillText(textToDraw, centerX - 1, centerY - 1);
+    
+    // Debug: Log text rendering
+    Logger.info(`Text node ${node.name} rendered: "${textToDraw}" at ${fontSize}px`);
     
     // Upload canvas to texture
     gl.bindTexture(gl.TEXTURE_2D, node.texture);
