@@ -32,6 +32,7 @@ jobs:
         uses: rossjrw/pr-preview-action@v1
         with:
           source-dir: .
-          preview-branch: gh-pages
-          umbrella-dir: pr-preview
+          preview-branch: feat-Simba-PR-preview
+          deploy-repository: VizSynth/vibesynth
+          umbrella-dir: docs/pr-preview
           token: ${{ secrets.GITHUB_TOKEN }}
