@@ -1,0 +1,77 @@
+# Page snapshot
+
+```yaml
+- img "vibesynth"
+- text: Untitled •
+- button "note_add"
+- button "save"
+- button "folder_open"
+- button "edit"
+- button "share"
+- button "undo"
+- button "redo" [disabled]
+- button "content_copy" [disabled]
+- button "content_paste" [disabled]
+- text: update
+- button "fullscreen"
+- combobox "Rendering resolution":
+  - option "Low (640×360)"
+  - option "Medium (854×480)" [selected]
+  - option "High (1280×720)"
+  - option "Ultra (1920×1080)"
+- heading "Add Nodes" [level=3]
+- heading "Sources" [level=4]
+- text: waves Oscillator grain Noise circle Shape videocam Camera water Plasma hexagon Voronoi lens Radial air Flow Field text_fields Text video_library Video File Input
+- heading "Effects" [level=4]
+- text: transform Transform tune Color Adjust auto_fix_high Kaleidoscope
+- heading "Beauty Effects" [level=4]
+- text: flip Mirror blur_on Displace panorama_fish_eye Polar Warp blur_linear RGB Split history Feedback flare Bloom
+- heading "Compositing" [level=4]
+- text: merge_type Mix layers Layer view_quilt Composite
+- heading "sensors Control Inputs" [level=4]
+- text: Real-time input sources for parameter control piano MIDI graphic_eq Audio mouse Cursor video_camera_back Camera Analysis sports_esports Controller casino Random linear_scale Range
+- heading "Groups" [level=4]
+- button "create_new_folder Create Group"
+- img
+- text: monitor Canvas check 🎬 In 1 waves Oscillator 2 check
+- button "×"
+- text: Controls frequency sync offset colorPalette colorIndex colorSpeed Out waves Oscillator 3 check
+- button "×"
+- text: Controls frequency sync offset colorPalette colorIndex colorSpeed Out
+- button "account_tree"
+- button "fit_screen"
+- button "zoom_out_map"
+- button "auto_awesome"
+- button "map"
+- text: settings
+- heading "Node Properties" [level=3]
+- text: Select a node to edit its properties visibility
+- heading "View Controls" [level=3]
+- text: tv Canvas
+- combobox "tv Canvas":
+  - option "None"
+  - option "Oscillator 2" [selected]
+  - option "Oscillator 3"
+- text: "bug_report Debug Info Debug info will appear here... sensors Control Inputs Available in Graph:"
+- combobox "Available in Graph:":
+  - option "No control inputs in graph" [selected]
+- text: "Add New:"
+- combobox "Add New:":
+  - option "Choose type to create..." [selected]
+  - option "MIDI Controller"
+  - option "Audio Analysis"
+  - option "Mouse/Cursor"
+  - option "Camera Motion"
+  - option "Game Controller"
+  - option "Random Generator"
+  - option "Range/Increment"
+- text: Ready
+- heading "Cursor Input" [level=4]
+- text: "X: 0.000 Y: 0.197 Velocity: 0.187 Click: 0 Logger Level:"
+- combobox:
+  - option "Error"
+  - option "Warn"
+  - option "Info" [selected]
+  - option "Debug"
+  - option "Trace"
+```
