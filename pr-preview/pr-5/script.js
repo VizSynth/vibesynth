@@ -1276,7 +1276,7 @@ class SynthNode {
       },
       Text: {
         inputs: [],
-        params: { text: 'Hello', font: 'Inter Bold 96pt', fillColor: '#ffffff' },
+        params: { text: 'VibeSynth', font: 'Inter Bold 64pt', fillColor: '#ffffff' },
         icon: 'text_fields',
         category: 'source'
       },
@@ -8145,26 +8145,52 @@ function renderNode(node, time) {
   if (node.type === 'Text') {
     if (!node.textCanvas) {
       node.textCanvas = document.createElement('canvas');
-      node.textCanvas.width = canvas.width;
-      node.textCanvas.height = canvas.height;
       node.textCtx = node.textCanvas.getContext('2d');
     }
     
-    // Clear canvas
+    // Update canvas size if resolution changed
+    if (node.textCanvas.width !== canvas.width || node.textCanvas.height !== canvas.height) {
+      node.textCanvas.width = canvas.width;
+      node.textCanvas.height = canvas.height;
+    }
+    
+    // Clear canvas (transparent background)
     node.textCtx.clearRect(0, 0, node.textCanvas.width, node.textCanvas.height);
     
-    // Set text properties
-    node.textCtx.font = node.params.font || 'Inter Bold 96pt';
-    node.textCtx.fillStyle = node.params.fillColor || '#ffffff';
+    // Set text properties - make it VERY visible
+    const fontSize = Math.min(node.textCanvas.width, node.textCanvas.height) / 4; // Even larger text
+    node.textCtx.font = node.params.font || `900 ${fontSize}px Arial`; // Use Arial as fallback, 900 weight
     node.textCtx.textAlign = 'center';
     node.textCtx.textBaseline = 'middle';
     
-    // Draw text
-    node.textCtx.fillText(
-      node.params.text || 'Hello',
-      node.textCanvas.width / 2,
-      node.textCanvas.height / 2
-    );
+    const textToDraw = node.params.text || 'VibeSynth';
+    const centerX = node.textCanvas.width / 2;
+    const centerY = node.textCanvas.height / 2;
+    
+    // Draw multiple stroke layers for maximum visibility
+    node.textCtx.strokeStyle = '#000000';
+    node.textCtx.lineWidth = 8;
+    node.textCtx.strokeText(textToDraw, centerX, centerY);
+    
+    node.textCtx.strokeStyle = '#333333';
+    node.textCtx.lineWidth = 6;
+    node.textCtx.strokeText(textToDraw, centerX, centerY);
+    
+    // Draw the main text with bright color
+    node.textCtx.fillStyle = node.params.fillColor || '#ffffff';
+    node.textCtx.shadowColor = 'rgba(0, 0, 0, 1.0)';
+    node.textCtx.shadowBlur = 10;
+    node.textCtx.shadowOffsetX = 3;
+    node.textCtx.shadowOffsetY = 3;
+    node.textCtx.fillText(textToDraw, centerX, centerY);
+    
+    // Add a bright highlight
+    node.textCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    node.textCtx.shadowColor = 'transparent';
+    node.textCtx.fillText(textToDraw, centerX - 1, centerY - 1);
+    
+    // Debug: Log text rendering
+    Logger.info(`Text node ${node.name} rendered: "${textToDraw}" at ${fontSize}px`);
     
     // Upload canvas to texture
     gl.bindTexture(gl.TEXTURE_2D, node.texture);
