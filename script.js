@@ -1276,7 +1276,7 @@ class SynthNode {
       },
       Text: {
         inputs: [],
-        params: { text: 'VibeSynth', font: 'Inter Bold 64pt', fillColor: '#00ffff' },
+        params: { text: 'VibeSynth', font: 'Inter Bold 64pt', fillColor: '#ffffff' },
         icon: 'text_fields',
         category: 'source'
       },
@@ -8154,23 +8154,21 @@ function renderNode(node, time) {
       node.textCanvas.height = canvas.height;
     }
     
-    // Clear canvas
+    // Clear canvas (transparent background)
     node.textCtx.clearRect(0, 0, node.textCanvas.width, node.textCanvas.height);
     
-    // Add a subtle background to make text visible
-    node.textCtx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-    node.textCtx.fillRect(0, 0, node.textCanvas.width, node.textCanvas.height);
-    
     // Set text properties
-    const fontSize = Math.min(node.textCanvas.width, node.textCanvas.height) / 8; // Responsive font size
+    const fontSize = Math.min(node.textCanvas.width, node.textCanvas.height) / 6; // Larger text
     node.textCtx.font = node.params.font || `Bold ${fontSize}px Inter`;
-    node.textCtx.fillStyle = node.params.fillColor || '#00ffff';
+    node.textCtx.fillStyle = node.params.fillColor || '#ffffff'; // White by default for visibility
     node.textCtx.textAlign = 'center';
     node.textCtx.textBaseline = 'middle';
-    node.textCtx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-    node.textCtx.shadowBlur = 6;
-    node.textCtx.shadowOffsetX = 3;
-    node.textCtx.shadowOffsetY = 3;
+    
+    // Strong shadow for visibility on any background
+    node.textCtx.shadowColor = 'rgba(0, 0, 0, 1.0)';
+    node.textCtx.shadowBlur = 8;
+    node.textCtx.shadowOffsetX = 4;
+    node.textCtx.shadowOffsetY = 4;
     
     // Draw text
     const textToDraw = node.params.text || 'VibeSynth';
@@ -8180,9 +8178,9 @@ function renderNode(node, time) {
       node.textCanvas.height / 2
     );
     
-    // Add white stroke for better visibility
-    node.textCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    node.textCtx.lineWidth = 2;
+    // Add strong black stroke outline for maximum visibility
+    node.textCtx.strokeStyle = 'rgba(0, 0, 0, 1.0)';
+    node.textCtx.lineWidth = 4;
     node.textCtx.strokeText(
       textToDraw,
       node.textCanvas.width / 2,
