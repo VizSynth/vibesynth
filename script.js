@@ -8157,19 +8157,34 @@ function renderNode(node, time) {
     // Clear canvas
     node.textCtx.clearRect(0, 0, node.textCanvas.width, node.textCanvas.height);
     
+    // Add a subtle background to make text visible
+    node.textCtx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+    node.textCtx.fillRect(0, 0, node.textCanvas.width, node.textCanvas.height);
+    
     // Set text properties
-    node.textCtx.font = node.params.font || 'Inter Bold 64pt';
+    const fontSize = Math.min(node.textCanvas.width, node.textCanvas.height) / 8; // Responsive font size
+    node.textCtx.font = node.params.font || `Bold ${fontSize}px Inter`;
     node.textCtx.fillStyle = node.params.fillColor || '#00ffff';
     node.textCtx.textAlign = 'center';
     node.textCtx.textBaseline = 'middle';
-    node.textCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    node.textCtx.shadowBlur = 4;
-    node.textCtx.shadowOffsetX = 2;
-    node.textCtx.shadowOffsetY = 2;
+    node.textCtx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    node.textCtx.shadowBlur = 6;
+    node.textCtx.shadowOffsetX = 3;
+    node.textCtx.shadowOffsetY = 3;
     
     // Draw text
+    const textToDraw = node.params.text || 'VibeSynth';
     node.textCtx.fillText(
-      node.params.text || 'VibeSynth',
+      textToDraw,
+      node.textCanvas.width / 2,
+      node.textCanvas.height / 2
+    );
+    
+    // Add white stroke for better visibility
+    node.textCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    node.textCtx.lineWidth = 2;
+    node.textCtx.strokeText(
+      textToDraw,
       node.textCanvas.width / 2,
       node.textCanvas.height / 2
     );
