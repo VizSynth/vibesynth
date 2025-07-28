@@ -4,7 +4,7 @@ on:
   pull_request:
     types:
       - opened
-      - reopened
+      - reopened  
       - synchronize
       - closed
     branches: [feat-Simba-PR-preview]
@@ -14,15 +14,12 @@ concurrency: preview-${{ github.ref }}
 jobs:
   deploy-preview:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       # VibeSynth is vanilla JS - no build step needed!
-      # Files are ready to deploy as-is
+      # Files are ready to deploy as-is from root directory
 
       - name: Deploy preview
         uses: rossjrw/pr-preview-action@v1
