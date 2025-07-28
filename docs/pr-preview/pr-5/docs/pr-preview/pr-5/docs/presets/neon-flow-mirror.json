@@ -1,0 +1,49 @@
+{
+  "name": "Neon Flow Mirror",
+  "description": "Flowing neon fields with mirrored symmetry and RGB split effect",
+  "nodes": [
+    {
+      "id": 1,
+      "type": "FlowField",
+      "name": "Flow Field",
+      "x": 100,
+      "y": 200,
+      "params": {
+        "fieldScale": 1.7,
+        "timeWarp": 0.4
+      }
+    },
+    {
+      "id": 2,
+      "type": "Mirror",
+      "name": "Mirror",
+      "x": 400,
+      "y": 200,
+      "params": {
+        "mode": "radial",
+        "sides": 6
+      },
+      "inputs": [1]
+    },
+    {
+      "id": 3,
+      "type": "RGBSplit",
+      "name": "RGB Split",
+      "x": 700,
+      "y": 200,
+      "params": {
+        "offset": 3,
+        "falloff": 0.85
+      },
+      "inputs": [2]
+    },
+    {
+      "id": 4,
+      "type": "FinalOutput",
+      "name": "Canvas",
+      "x": 1000,
+      "y": 200,
+      "inputs": [3]
+    }
+  ]
+}
