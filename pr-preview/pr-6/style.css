@@ -452,7 +452,7 @@ html, body {
   position: absolute;
   min-width: 140px;
   max-width: 180px;
-  background: var(--bg-secondary) !important;
+  background: #2a2a2a !important;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   box-shadow: var(--shadow);
@@ -463,6 +463,11 @@ html, body {
               box-shadow 0.2s ease,
               border-color 0.2s ease,
               opacity 0.2s ease;
+}
+
+/* Ensure all node children have solid backgrounds */
+.graph-node * {
+  background-color: inherit !important;
 }
 
 /* Node Type Specific Styling */
@@ -537,7 +542,7 @@ html, body {
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  background: var(--bg-tertiary);
+  background: #333333 !important;
   border-bottom: 1px solid var(--border-color);
   border-radius: var(--border-radius) var(--border-radius) 0 0;
 }
@@ -618,7 +623,7 @@ html, body {
 
 .node-body {
   padding: 10px 8px;
-  background: var(--bg-secondary) !important;
+  background: #2a2a2a !important;
 }
 
 /* Node Ports */
