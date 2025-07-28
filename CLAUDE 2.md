@@ -12,19 +12,26 @@ VibeSynth is a web-based modular video synthesizer that creates real-time visual
 # Start development server
 npm start              # Runs Python HTTP server on port 8080
 
-# Run tests (in browser console)
-runAllTests()          # Run all tests
+# Automated deployment (RECOMMENDED)
+./deploy.sh --branch "feat-feature-name"           # Full automated workflow
+./deploy.sh --branch "fix-bug" --message "custom"  # With custom commit message
+./deploy.sh --branch "docs-only" --skip-tests      # Skip tests for docs-only
+./deploy.sh --branch "perf-update" --skip-docs     # Skip docs build
+
+# Manual testing
+npm test               # Run full test suite (Playwright + ESLint)
+npm run lint           # Run ESLint only
+npm run test:playwright # Run Playwright tests only
+
+# Browser console testing (legacy)
+runAllTests()          # Run all browser tests
 runTest('testName')    # Run specific test
 createTestScenario()   # Create test nodes for manual testing
 
-# Create checkpoint (when user requests)
+# Manual checkpoint (legacy - use deploy.sh instead)
 bash backup.sh         # Create timestamped backup
 git add -A
 git commit -m "type: summary"  # types: feat, fix, refactor, test, docs, style, perf, chore
-
-# AWS S3 Deployment
-./deploy-local-test.sh  # Test deployment process locally
-./deploy-s3.sh          # Deploy to AWS S3 (requires AWS CLI configured)
 ```
 
 ## Architecture Overview
@@ -58,19 +65,31 @@ git commit -m "type: summary"  # types: feat, fix, refactor, test, docs, style, 
    - Features: `feat-<description>` (e.g., `feat-audio-reactive-controls`)
    - Bugs: `fix-<description>` (e.g., `fix-memory-leak`)
    - Say: "I'll create branch `feat-xyz` for this work"
-2. **Create branch before ANY changes**: `git checkout -b branch-name`
+2. **Use deploy.sh for ALL commits**: `./deploy.sh --branch "branch-name"`
 3. **Check current branch**: `git branch --show-current`
 4. **All commits go to feature branch**, PR to main when complete
 
+### Automated CI/CD Pipeline
+VibeSynth uses comprehensive automated testing and deployment:
+- **Every push triggers**: Playwright tests, ESLint, security scans
+- **Auto-deployment**: Development, staging, production environments
+- **Deployment blocking**: Tests must pass or deployment fails
+- **Zero-downtime**: No broken code reaches production
+
 ### Testing Requirements
-Before any feature is complete:
-1. Add tests to `test-suite.js`
-2. Run `runAllTests()` in browser console
-3. Fix any failing tests
-4. Test edge cases and performance
+All testing is automated via deploy.sh and CI/CD:
+1. **Playwright tests**: 9 browser test scenarios (UI, WebGL, interactions)
+2. **ESLint**: Code quality and style enforcement
+3. **Security**: Automated vulnerability scanning
+4. **Manual testing**: Add tests to `tests/vibesynth.spec.js` for new features
 
 ### Checkpoint Protocol
-When user mentions: `[Checkpoint]`, `checkpoint`, `save progress`, `commit this`:
+**RECOMMENDED**: Use deploy.sh instead of manual checkpoints
+```bash
+./deploy.sh --branch "current-branch"  # Automated workflow
+```
+
+**Legacy manual method** (when user mentions: `[Checkpoint]`, `checkpoint`, `save progress`, `commit this`):
 1. Run `bash backup.sh` to create timestamped backup
 2. Stage all changes with `git add -A`
 3. Create descriptive commit with proper format
@@ -82,20 +101,6 @@ When user mentions: `[Checkpoint]`, `checkpoint`, `save progress`, `commit this`
 - Maintain WebGL resource cleanup
 - Add comprehensive error handling
 - Use existing Logger system for debugging
-
-## Deployment Options
-
-### GitHub Pages (Current)
-- **Staging**: Automatic deployment from `main` branch
-- **Production**: Manual deployment via GitHub Actions
-- **PR Previews**: Automatic preview deployments for pull requests
-
-### AWS S3 (New)
-- **Setup Guide**: See `AWS-SETUP.md` for detailed instructions
-- **Local Testing**: `./deploy-local-test.sh` - Test deployment without uploading
-- **Manual Deploy**: `./deploy-s3.sh` - Deploy to S3 (requires AWS CLI)
-- **Auto Deploy**: GitHub Actions workflow for staging/production environments
-- **Benefits**: Better performance, custom domains, CloudFront CDN integration
 
 ## Important Notes
 

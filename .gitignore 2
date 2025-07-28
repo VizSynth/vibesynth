@@ -1,0 +1,29 @@
+# Checkpoints, backups, and /docs
+checkpoint-*/
+*.backup
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Dependencies (if added later)
+node_modules/
+
+# Build outputs (if added later)
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Screenshots
+screenshots/

@@ -1,0 +1,124 @@
+name: Deploy to AWS S3
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+# Allow only one concurrent deployment per environment
+concurrency:
+  group: aws-deploy-${{ github.event.inputs.environment || 'auto' }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-s3:
+    name: "🌍 Deploy to AWS S3"
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || (github.event_name == 'release' && 'production' || 'staging') }}
+    permissions:
+      contents: read
+      id-token: write # Required for AWS OIDC
+    
+    steps:
+      - name: "📥 Checkout code"
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "⚙️ Configure AWS credentials"
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          role-session-name: vibesynth-deploy-${{ github.run_id }}
+
+      - name: "🔍 Verify AWS access"
+        run: |
+          echo "AWS Account ID: $(aws sts get-caller-identity --query Account --output text)"
+          echo "AWS Region: ${{ vars.AWS_REGION || 'us-east-1' }}"
+          echo "Environment: ${{ github.event.inputs.environment || (github.event_name == 'release' && 'production' || 'staging') }}"
+
+      - name: "🚀 Deploy to S3 (Staging)"
+        if: ${{ github.event.inputs.environment == 'staging' || (github.ref == 'refs/heads/main' && github.event_name == 'push') }}
+        env:
+          AWS_S3_BUCKET: ${{ vars.AWS_S3_BUCKET_STAGING }}
+          AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.AWS_CLOUDFRONT_DISTRIBUTION_ID_STAGING }}
+          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+        run: |
+          echo "🎯 Deploying to STAGING environment"
+          echo "Bucket: $AWS_S3_BUCKET"
+          ./deploy-s3.sh
+
+      - name: "🌍 Deploy to S3 (Production)"
+        if: ${{ github.event.inputs.environment == 'production' || github.event_name == 'release' }}
+        env:
+          AWS_S3_BUCKET: ${{ vars.AWS_S3_BUCKET_PRODUCTION }}
+          AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.AWS_CLOUDFRONT_DISTRIBUTION_ID_PRODUCTION }}
+          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+        run: |
+          echo "🌍 Deploying to PRODUCTION environment"
+          echo "Bucket: $AWS_S3_BUCKET"
+          ./deploy-s3.sh
+
+      - name: "📊 Deployment summary"
+        run: |
+          ENV="${{ github.event.inputs.environment || (github.event_name == 'release' && 'production' || 'staging') }}"
+          BUCKET_VAR="AWS_S3_BUCKET_$(echo $ENV | tr '[:lower:]' '[:upper:]')"
+          
+          echo "## 🎉 VibeSynth Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** $ENV" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Access your deployment:" >> $GITHUB_STEP_SUMMARY
+          echo "- **S3 Website:** Check your S3 bucket static website URL" >> $GITHUB_STEP_SUMMARY
+          echo "- **CloudFront:** Check your CloudFront distribution (if configured)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 What was deployed:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ All HTML, CSS, and JavaScript files" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Assets and images" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Proper cache headers configured" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ CloudFront cache invalidated (if configured)" >> $GITHUB_STEP_SUMMARY
+
+  notify-success:
+    name: "📢 Notify Success"
+    runs-on: ubuntu-latest
+    needs: [deploy-s3]
+    if: success()
+    
+    steps:
+      - name: "✅ Success notification"
+        run: |
+          ENV="${{ github.event.inputs.environment || (github.event_name == 'release' && 'production' || 'staging') }}"
+          echo "::notice::🎉 VibeSynth successfully deployed to $ENV!"
+          echo "::notice::🌍 Your visual synthesizer is now live on AWS S3"
+          echo "::notice::🚀 Build: ${{ github.run_number }}"
+          echo "::notice::📋 Commit: ${{ github.sha }}"
+
+  notify-failure:
+    name: "📢 Notify Failure"
+    runs-on: ubuntu-latest
+    needs: [deploy-s3]
+    if: failure()
+    
+    steps:
+      - name: "❌ Failure notification"
+        run: |
+          ENV="${{ github.event.inputs.environment || (github.event_name == 'release' && 'production' || 'staging') }}"
+          echo "::error::🚨 VibeSynth deployment to $ENV FAILED!"
+          echo "::error::❌ Check the deployment logs for details"
+          echo "::error::🔍 Common issues: AWS credentials, bucket permissions, CloudFront configuration"
+          echo "::error::📋 Failed commit: ${{ github.sha }}"
+          exit 1
