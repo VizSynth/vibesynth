@@ -1475,6 +1475,11 @@ class SynthNode {
       if (this.type === 'FeedbackTrail') programName = 'feedbacktrail';
       
       this.program = programs[programName];
+      
+      // Debug logging for Text nodes
+      if (this.type === 'Text') {
+        Logger.info(`Text node program assignment: ${programName} -> ${this.program ? 'SUCCESS' : 'FAILED'}`);
+      }
 
       // Initialize Random nodes with a random value
       if (this.type === 'RandomInput') {
@@ -8095,6 +8100,7 @@ function renderNode(node, time) {
   
   // Handle Text node - render text to canvas then upload as texture
   if (node.type === 'Text') {
+    Logger.info(`Rendering Text node: "${node.params.text}" size=${node.params.size}`);
     if (!node.textCanvas) {
       node.textCanvas = document.createElement('canvas');
       node.textCanvas.width = canvas.width;
