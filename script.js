@@ -8105,11 +8105,11 @@ function renderNode(node, time) {
     // Clear canvas
     node.textCtx.clearRect(0, 0, node.textCanvas.width, node.textCanvas.height);
     
-    // Get effective parameter values (including control inputs)
-    const effectiveSize = getEffectiveValue(node, 'size', 0);
-    const effectiveOpacity = getEffectiveValue(node, 'opacity', 1);
-    const effectivePositionX = getEffectiveValue(node, 'positionX', 2);
-    const effectivePositionY = getEffectiveValue(node, 'positionY', 3);
+    // Get parameter values (control inputs will be added later)
+    const effectiveSize = node.params.size || 96;
+    const effectiveOpacity = node.params.opacity || 1.0;
+    const effectivePositionX = node.params.positionX || 0.0;
+    const effectivePositionY = node.params.positionY || 0.0;
     
     // Set text properties with dynamic size
     const fontFamily = node.params.fontFamily || 'Inter';
