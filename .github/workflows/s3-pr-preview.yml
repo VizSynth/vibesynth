@@ -33,22 +33,22 @@ jobs:
       - name: "⚙️ Configure AWS credentials"
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.aws_region || 'us-east-1' }}
-          role-session-name: vibesynth-pr-preview-${{ github.event.number }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.aws_region || 'us-west-1' }}
 
       - name: "🔍 Verify AWS access"
         run: |
           echo "AWS Account ID: $(aws sts get-caller-identity --query Account --output text)"
           echo "PR Number: ${{ github.event.number }}"
-          echo "AWS Region: ${{ vars.aws_region || 'us-east-1' }}"
+          echo "AWS Region: ${{ vars.aws_region || 'us-west-1' }}"
 
       - name: "🚀 Deploy PR preview to S3"
         env:
           PR_NUMBER: ${{ github.event.number }}
           AWS_S3_BUCKET: ${{ vars.aws_s3_bucket_pr_previews || 'vibesynth-pr-previews' }}
           AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.aws_cloudfront_distribution_id_previews }}
-          AWS_REGION: ${{ vars.aws_region || 'us-east-1' }}
+          AWS_REGION: ${{ vars.aws_region || 'us-west-1' }}
         run: |
           echo "🎯 Deploying PR #${PR_NUMBER} to S3"
           echo "Bucket: $AWS_S3_BUCKET"
@@ -113,7 +113,7 @@ jobs:
           script: |
             const prNumber = context.payload.number;
             const bucketName = process.env.AWS_S3_BUCKET_PR_PREVIEWS || 'vibesynth-pr-previews';
-            const region = process.env.AWS_REGION || 'us-east-1';
+            const region = process.env.AWS_REGION || 'us-west-1';
             const hasCloudFront = process.env.AWS_CLOUDFRONT_DISTRIBUTION_ID_PREVIEWS;
             
             // Generate preview URLs
@@ -138,14 +138,14 @@ jobs:
             });
         env:
           AWS_S3_BUCKET_PR_PREVIEWS: ${{ vars.aws_s3_bucket_pr_previews || 'vibesynth-pr-previews' }}
-          AWS_REGION: ${{ vars.aws_region || 'us-east-1' }}
+          AWS_REGION: ${{ vars.aws_region || 'us-west-1' }}
           AWS_CLOUDFRONT_DISTRIBUTION_ID_PREVIEWS: ${{ vars.aws_cloudfront_distribution_id_previews }}
 
       - name: "📊 Deployment summary"
         env:
           PR_NUMBER: ${{ github.event.number }}
           AWS_S3_BUCKET: ${{ vars.aws_s3_bucket_pr_previews || 'vibesynth-pr-previews' }}
-          AWS_REGION: ${{ vars.aws_region || 'us-east-1' }}
+          AWS_REGION: ${{ vars.aws_region || 'us-west-1' }}
         run: |
           echo "## 🎉 PR Preview Deployment Successful" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -181,9 +181,9 @@ jobs:
       - name: "⚙️ Configure AWS credentials"
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.aws_region || 'us-east-1' }}
-          role-session-name: vibesynth-pr-cleanup-${{ github.event.number }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.aws_region || 'us-west-1' }}
 
       - name: "🗑️ Remove PR preview from S3"
         env:
