@@ -989,6 +989,10 @@ window.requestAudioPermission = async function() {
       updatePermissionUI();
       
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('getUserMedia not supported');
+      }
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
@@ -6845,6 +6849,10 @@ function showNodeProperties(node) {
         try {
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('getUserMedia not supported');
+          }
+          
           const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
               echoCancellation: false,
@@ -10222,6 +10230,10 @@ async function enableCameraInput() {
   try {
     permissions.camera.requested = true;
     updatePermissionUI();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('getUserMedia not supported');
+    }
+    
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { width: 320, height: 240 } // Low resolution for analysis
     });
@@ -10264,6 +10276,10 @@ async function enableWebcamForNode(node) {
         height: { ideal: 720 }
       }
     };
+    
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('getUserMedia not supported');
+    }
     
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     
