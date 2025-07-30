@@ -1,4 +1,4 @@
-name: Deploy to AWS S3
+name: Deploy to AWS S3 (Production & Staging)
 
 on:
   push:
@@ -40,35 +40,36 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          aws-region: ${{ vars.aws_region || 'us-east-1' }}
           role-session-name: vibesynth-deploy-${{ github.run_id }}
 
       - name: "🔍 Verify AWS access"
         run: |
           echo "AWS Account ID: $(aws sts get-caller-identity --query Account --output text)"
-          echo "AWS Region: ${{ vars.AWS_REGION || 'us-east-1' }}"
+          echo "AWS Region: ${{ vars.aws_region || 'us-east-1' }}"
           echo "Environment: ${{ github.event.inputs.environment || (github.event_name == 'release' && 'production' || 'staging') }}"
 
       - name: "🚀 Deploy to S3 (Staging)"
         if: ${{ github.event.inputs.environment == 'staging' || (github.ref == 'refs/heads/main' && github.event_name == 'push') }}
         env:
-          AWS_S3_BUCKET: ${{ vars.AWS_S3_BUCKET_STAGING }}
-          AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.AWS_CLOUDFRONT_DISTRIBUTION_ID_STAGING }}
-          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+          AWS_S3_BUCKET: ${{ vars.aws_s3_bucket_staging }}
+          AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.aws_cloudfront_distribution_id_staging }}
+          AWS_REGION: ${{ vars.aws_region || 'us-east-1' }}
         run: |
           echo "🎯 Deploying to STAGING environment"
           echo "Bucket: $AWS_S3_BUCKET"
           ./deploy-s3.sh
 
-      - name: "🌍 Deploy to S3 (Production)"
+      - name: "🌍 Deploy to S3 (Production - vibesynth.one)"
         if: ${{ github.event.inputs.environment == 'production' || github.event_name == 'release' }}
         env:
-          AWS_S3_BUCKET: ${{ vars.AWS_S3_BUCKET_PRODUCTION }}
-          AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.AWS_CLOUDFRONT_DISTRIBUTION_ID_PRODUCTION }}
-          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+          AWS_S3_BUCKET: ${{ vars.aws_s3_bucket_production }}
+          AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.aws_cloudfront_distribution_id_production }}
+          AWS_REGION: ${{ vars.aws_region || 'us-east-1' }}
         run: |
-          echo "🌍 Deploying to PRODUCTION environment"
+          echo "🌍 Deploying to PRODUCTION environment (vibesynth.one)"
           echo "Bucket: $AWS_S3_BUCKET"
+          echo "This will serve vibesynth.one via S3 + CloudFront"
           ./deploy-s3.sh
 
       - name: "📊 Deployment summary"
@@ -83,8 +84,13 @@ jobs:
           echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🔗 Access your deployment:" >> $GITHUB_STEP_SUMMARY
-          echo "- **S3 Website:** Check your S3 bucket static website URL" >> $GITHUB_STEP_SUMMARY
-          echo "- **CloudFront:** Check your CloudFront distribution (if configured)" >> $GITHUB_STEP_SUMMARY
+          if [ "$ENV" = "production" ]; then
+            echo "- **Production URL:** https://vibesynth.one (via CloudFront)" >> $GITHUB_STEP_SUMMARY
+            echo "- **Direct S3 URL:** Check your S3 bucket static website URL" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Staging URL:** Check your staging CloudFront distribution" >> $GITHUB_STEP_SUMMARY
+            echo "- **Direct S3 URL:** Check your S3 bucket static website URL" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📋 What was deployed:" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ All HTML, CSS, and JavaScript files" >> $GITHUB_STEP_SUMMARY

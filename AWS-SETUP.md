@@ -1,15 +1,16 @@
-# AWS S3 Deployment Setup for VibeSynth
+# AWS S3 Complete Hosting Setup for VibeSynth
 
-This guide will help you deploy VibeSynth to AWS S3 for fast, reliable hosting with optional CloudFront CDN integration.
+This guide will help you deploy VibeSynth entirely on AWS S3 with CloudFront CDN, replacing GitHub Pages completely. Includes production hosting for vibesynth.one and automatic PR previews.
 
 ## Overview
 
-VibeSynth can be deployed to AWS S3 as a static website, providing:
-- **Fast global delivery** with S3's robust infrastructure
-- **Cost-effective hosting** for static web applications
-- **Scalability** to handle traffic spikes
-- **Optional CloudFront CDN** for even better performance and HTTPS
-- **Automated deployments** via GitHub Actions
+VibeSynth uses AWS S3 + CloudFront for complete hosting, providing:
+- **Fast global delivery** with CloudFront CDN and S3's robust infrastructure
+- **Cost-effective hosting** (~$2/month for production + unlimited PR previews)
+- **Automatic PR previews** with custom subdomains (pr-123.vibesynth.one)
+- **Production hosting** for vibesynth.one via CloudFront + Route 53
+- **Instant deployments** with cache invalidation and automated cleanup
+- **No GitHub Pages limitations** - full control over hosting
 
 ## Prerequisites
 
@@ -64,13 +65,22 @@ The script will:
 
 ## Environment Variables
 
-The deployment script uses these environment variables:
+The deployment scripts use these environment variables:
 
+### Production & Staging
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `AWS_S3_BUCKET` | S3 bucket name | `vibesynth-app` |
-| `AWS_REGION` | AWS region | `us-east-1` |
-| `AWS_CLOUDFRONT_DISTRIBUTION_ID` | CloudFront distribution ID (optional) | - |
+| `AWS_S3_BUCKET_PRODUCTION` | Production S3 bucket | `vibesynth-production` |
+| `AWS_S3_BUCKET_STAGING` | Staging S3 bucket | `vibesynth-staging` |
+| `AWS_CLOUDFRONT_DISTRIBUTION_ID_PRODUCTION` | Production CloudFront ID | - |
+| `AWS_CLOUDFRONT_DISTRIBUTION_ID_STAGING` | Staging CloudFront ID | - |
+
+### PR Previews
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `AWS_S3_BUCKET_PR_PREVIEWS` | PR previews S3 bucket | `vibesynth-pr-previews` |
+| `AWS_CLOUDFRONT_DISTRIBUTION_ID_PREVIEWS` | PR previews CloudFront ID | - |
+| `AWS_REGION` | AWS region for all buckets | `us-east-1` |
 
 ### Example with custom settings:
 
@@ -97,8 +107,10 @@ Go to your GitHub repo → Settings → Secrets and variables → Actions
 AWS_REGION=us-east-1
 AWS_S3_BUCKET_STAGING=vibesynth-staging
 AWS_S3_BUCKET_PRODUCTION=vibesynth-production
-AWS_CLOUDFRONT_DISTRIBUTION_ID_STAGING=E1234567890123  # Optional
-AWS_CLOUDFRONT_DISTRIBUTION_ID_PRODUCTION=E0987654321098  # Optional
+AWS_S3_BUCKET_PR_PREVIEWS=vibesynth-pr-previews
+AWS_CLOUDFRONT_DISTRIBUTION_ID_STAGING=E1234567890123
+AWS_CLOUDFRONT_DISTRIBUTION_ID_PRODUCTION=E0987654321098
+AWS_CLOUDFRONT_DISTRIBUTION_ID_PREVIEWS=E1111111111111
 ```
 
 **Repository Secrets:**
@@ -108,46 +120,85 @@ AWS_ROLE_ARN=arn:aws:iam::123456789012:role/vibesynth-deploy-role
 
 ### Deployment Triggers
 
-The GitHub Actions workflow will automatically deploy:
+The GitHub Actions workflows will automatically deploy:
 
-- **Staging**: When you push to the `main` branch
-- **Production**: When you create a GitHub release
+- **PR Previews**: When you open/update a pull request → `pr-123.vibesynth.one`
+- **Staging**: When you push to the `main` branch → staging S3 bucket
+- **Production**: When you create a GitHub release → `vibesynth.one` 
 - **Manual**: You can trigger deployments manually with environment selection
 
-## CloudFront Setup (Optional but Recommended)
+### PR Preview System
 
-CloudFront provides:
+**Automatic PR Previews** are deployed to S3 with the following features:
+
+- **Custom URLs**: Each PR gets `pr-{number}.vibesynth.one` (e.g., `pr-456.vibesynth.one`)
+- **Instant Updates**: Every commit to the PR automatically updates the preview
+- **Auto Comments**: GitHub bot comments the preview URL on each PR
+- **Auto Cleanup**: When PR is closed, preview is automatically deleted from S3
+- **S3 Bucket Structure**: `s3://vibesynth-pr-previews/pr-123/` (isolated per PR)
+
+## CloudFront Setup (Required for Custom Domains)
+
+CloudFront is **required** for the complete VibeSynth hosting setup and provides:
 - **HTTPS** support with free SSL certificates
-- **Better performance** with global edge locations
-- **Custom domain** support
-- **Advanced caching** controls
+- **Custom domain** support for vibesynth.one and PR previews
+- **Better performance** with global edge locations  
+- **Advanced caching** controls and instant cache invalidation
 
-### Quick CloudFront Setup:
+### Complete Hosting Architecture
+
+**Three S3 Buckets + CloudFront Distributions:**
+
+1. **Production**: `vibesynth-production` → CloudFront → `vibesynth.one`
+2. **Staging**: `vibesynth-staging` → CloudFront → `staging.vibesynth.one`  
+3. **PR Previews**: `vibesynth-pr-previews` → CloudFront → `pr-*.vibesynth.one`
+
+### CloudFront Setup (Required for each environment):
+
+**For each bucket, create a CloudFront Distribution:**
 
 1. **Create CloudFront Distribution**:
-   - Origin: Your S3 bucket website URL
+   - Origin: Your S3 bucket website URL (e.g., `vibesynth-production.s3-website-us-east-1.amazonaws.com`)
    - Viewer Protocol Policy: "Redirect HTTP to HTTPS"
    - Allowed HTTP Methods: GET, HEAD, OPTIONS
    - Cache Policy: "Caching Optimized"
+   - Alternate Domain Names (CNAMEs): Add your custom domains
 
-2. **Configure Custom Error Pages**:
+2. **Configure Custom Error Pages** (for SPA routing):
    - Error Code: 403, 404
    - Response Page Path: `/index.html`
    - Response Code: 200
 
-3. **Add Distribution ID** to your GitHub variables:
+3. **Add Distribution IDs** to your GitHub variables:
    ```
-   AWS_CLOUDFRONT_DISTRIBUTION_ID_STAGING=E1234567890123
+   AWS_CLOUDFRONT_DISTRIBUTION_ID_PRODUCTION=E1234567890123
+   AWS_CLOUDFRONT_DISTRIBUTION_ID_STAGING=E2345678901234
+   AWS_CLOUDFRONT_DISTRIBUTION_ID_PREVIEWS=E3456789012345
    ```
 
 ## Custom Domain Setup
 
-### Using Route 53 (AWS DNS):
+### Using Route 53 (AWS DNS) for vibesynth.one:
 
-1. **Register or transfer your domain** to Route 53
-2. **Create an A record** (alias) pointing to your CloudFront distribution
-3. **Request SSL certificate** in AWS Certificate Manager
-4. **Update CloudFront** to use your custom domain and SSL certificate
+**Complete DNS Setup for VibeSynth:**
+
+1. **SSL Certificate** (AWS Certificate Manager):
+   - Request certificate for `vibesynth.one` and `*.vibesynth.one`
+   - This covers production, staging, and all PR previews
+
+2. **Route 53 DNS Records**:
+   ```bash
+   # Production
+   A     vibesynth.one.           → CloudFront Distribution (Production)
+   
+   # Staging  
+   CNAME staging.vibesynth.one.   → CloudFront Distribution (Staging)
+   
+   # PR Previews (wildcard)
+   CNAME *.vibesynth.one.         → CloudFront Distribution (PR Previews)
+   ```
+
+3. **Update CloudFront distributions** to use custom domains and SSL certificate
 
 ### Using External DNS:
 
@@ -159,19 +210,27 @@ CloudFront provides:
 
 AWS S3 and CloudFront are very cost-effective for static websites:
 
-### Typical Monthly Costs for VibeSynth:
+### Complete VibeSynth Hosting Costs (Monthly):
 
-**S3 Storage & Requests:**
-- Storage (1GB): ~$0.02
-- Requests (10,000): ~$0.01
-- **Total S3**: ~$0.03/month
+**S3 Storage & Requests (3 buckets):**
+- Production Storage (1GB): ~$0.02
+- Staging Storage (1GB): ~$0.02  
+- PR Previews Storage (2GB): ~$0.05
+- Requests (50,000 total): ~$0.05
+- **Total S3**: ~$0.14/month
 
-**CloudFront (Optional):**
-- Data Transfer (10GB): ~$0.85
-- Requests (100,000): ~$0.01
-- **Total CloudFront**: ~$0.86/month
+**CloudFront (3 distributions):**
+- Production Data Transfer (10GB): ~$0.85
+- Staging Data Transfer (2GB): ~$0.17
+- PR Previews Data Transfer (5GB): ~$0.43
+- Requests (200,000 total): ~$0.02
+- **Total CloudFront**: ~$1.47/month
 
-**Total estimated cost: ~$0.89/month** for moderate traffic
+**Route 53:**
+- Hosted Zone: ~$0.50/month
+- DNS Queries (1M): ~$0.40/month
+
+**Total estimated cost: ~$2.51/month** for production + unlimited PR previews
 
 ## Security Best Practices
 
@@ -256,20 +315,26 @@ AWS_S3_BUCKET=vibesynth-dev ./deploy-s3.sh
 ## Quick Reference Commands
 
 ```bash
-# Deploy to default bucket
-./deploy-s3.sh
+# Production deployment
+AWS_S3_BUCKET=vibesynth-production ./deploy-s3.sh
 
-# Deploy to custom bucket
-AWS_S3_BUCKET=my-custom-bucket ./deploy-s3.sh
+# Staging deployment
+AWS_S3_BUCKET=vibesynth-staging ./deploy-s3.sh
 
-# Deploy with CloudFront invalidation
-AWS_CLOUDFRONT_DISTRIBUTION_ID=E1234567890123 ./deploy-s3.sh
+# Deploy PR preview
+PR_NUMBER=123 ./deploy-s3-pr-preview.sh
 
-# Check deployment
-aws s3 ls s3://your-bucket-name
+# Cleanup PR preview
+PR_NUMBER=123 ACTION=cleanup ./deploy-s3-pr-preview.sh
 
-# View website
-echo "http://your-bucket-name.s3-website-us-east-1.amazonaws.com"
+# Check deployments
+aws s3 ls s3://vibesynth-production/
+aws s3 ls s3://vibesynth-pr-previews/
+
+# View websites
+echo "https://vibesynth.one"
+echo "https://staging.vibesynth.one" 
+echo "https://pr-123.vibesynth.one"
 ```
 
 Happy deploying! 🚀
