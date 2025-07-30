@@ -1276,7 +1276,17 @@ class SynthNode {
       },
       Text: {
         inputs: [],
-        params: { text: 'Hello', font: 'Inter Bold 96pt', fillColor: '#ffffff' },
+        controlInputs: [null, null, null, null], // size, opacity, positionX, positionY
+        params: { 
+          text: 'Hello VibeSynth', 
+          size: 96, 
+          fillColor: '#ffffff',
+          fontFamily: 'Inter',
+          fontWeight: 'Bold',
+          opacity: 1.0,
+          positionX: 0.0,
+          positionY: 0.0
+        },
         icon: 'text_fields',
         category: 'source'
       },
@@ -8095,18 +8105,38 @@ function renderNode(node, time) {
     // Clear canvas
     node.textCtx.clearRect(0, 0, node.textCanvas.width, node.textCanvas.height);
     
-    // Set text properties
-    node.textCtx.font = node.params.font || 'Inter Bold 96pt';
+    // Get effective parameter values (including control inputs)
+    const effectiveSize = getEffectiveValue(node, 'size', 0);
+    const effectiveOpacity = getEffectiveValue(node, 'opacity', 1);
+    const effectivePositionX = getEffectiveValue(node, 'positionX', 2);
+    const effectivePositionY = getEffectiveValue(node, 'positionY', 3);
+    
+    // Set text properties with dynamic size
+    const fontFamily = node.params.fontFamily || 'Inter';
+    const fontWeight = node.params.fontWeight || 'Bold';
+    const fontSize = Math.max(8, Math.min(500, effectiveSize)); // Clamp size between 8-500px
+    
+    node.textCtx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
     node.textCtx.fillStyle = node.params.fillColor || '#ffffff';
     node.textCtx.textAlign = 'center';
     node.textCtx.textBaseline = 'middle';
     
+    // Set opacity
+    node.textCtx.globalAlpha = Math.max(0, Math.min(1, effectiveOpacity));
+    
+    // Calculate position with offset support
+    const centerX = node.textCanvas.width / 2 + (effectivePositionX * node.textCanvas.width / 2);
+    const centerY = node.textCanvas.height / 2 + (effectivePositionY * node.textCanvas.height / 2);
+    
     // Draw text
     node.textCtx.fillText(
-      node.params.text || 'Hello',
-      node.textCanvas.width / 2,
-      node.textCanvas.height / 2
+      node.params.text || 'Hello VibeSynth',
+      centerX,
+      centerY
     );
+    
+    // Reset opacity for future operations
+    node.textCtx.globalAlpha = 1.0;
     
     // Upload canvas to texture
     gl.bindTexture(gl.TEXTURE_2D, node.texture);
