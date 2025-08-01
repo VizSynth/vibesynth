@@ -182,12 +182,8 @@ jobs:
     name: "🌍 Deploy to Production"
     runs-on: ubuntu-latest
     needs: [test, lint, security]
-    if: github.event_name == 'release'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
     
     steps:
     - name: "📥 Checkout code"
@@ -200,28 +196,25 @@ jobs:
       with:
         node-version: '18'
         
-    - name: "🏗️ Run deploy script"
-      run: |
-        chmod +x deploy-docs.sh
-        ./deploy-docs.sh
-        
-    - name: "🌍 Deploy to Production (vibesynth.one)"
-      uses: peaceiris/actions-gh-pages@v3
+    - name: "🔧 Configure AWS credentials"
+      uses: aws-actions/configure-aws-credentials@v4
       with:
-        personal_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./docs
-        cname: vibesynth.one
-        force_orphan: true
-        user_name: 'github-actions[bot]'
-        user_email: 'github-actions[bot]@users.noreply.github.com'
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-west-1
+        
+    - name: "🌍 Deploy to S3 (vibesynth.one)"
+      run: |
+        chmod +x deploy-s3.sh
+        export AWS_S3_BUCKET=vibesynth.one
+        ./deploy-s3.sh
         
     - name: "🎉 Production deployment complete"
       run: |
         echo "🚀 Successfully deployed to PRODUCTION!"
-        echo "🌍 Live URL: https://vibesynth.one"
+        echo "🌍 Live URL: http://vibesynth.one"
         echo "📊 Build: ${{ github.run_number }}"
         echo "🔗 Commit: ${{ github.sha }}"
-        echo "📋 Release: ${{ github.event.release.tag_name }}"
 
   notify:
     name: "📢 Pipeline Status"
